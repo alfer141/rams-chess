@@ -5,7 +5,7 @@ No usa frameworks ni dependencias: HTML, CSS y JavaScript puros. Funciona en cua
 
 ## Jugar
 
-- **En línea:** desplegado en Vercel (ver enlace en la descripción del repositorio).
+- **En línea:** **https://rams-chess.vercel.app**
 - **En tu ordenador:** clona el repositorio y abre `index.html`, o sirve la carpeta con cualquier servidor estático:
 
 ```bash
@@ -57,8 +57,9 @@ Compara el número de nodos generados con los valores conocidos de posiciones de
 
 ## Desplegar en Vercel
 
-El proyecto es 100 % estático. Importa el repositorio en [Vercel](https://vercel.com/new) sin comando de *build*
-y con el directorio raíz como salida, o usa la CLI:
+El proyecto es 100 % estático y ya está conectado a Vercel: cada `git push` a `main` publica una nueva versión
+en https://rams-chess.vercel.app. Para desplegar tu propia copia, importa el repositorio en [Vercel](https://vercel.com/new)
+sin comando de *build*, o usa la CLI:
 
 ```bash
 npx vercel
