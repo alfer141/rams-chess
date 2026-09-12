@@ -17,7 +17,7 @@
 
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5,
-    hints: true, theme: 'light', sound: true, lang: 'es',
+    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow',
   }, load('rams-chess-settings'));
   let progress = load('rams-chess-progress');   // { lessonId: etapas completadas }
 
@@ -531,7 +531,19 @@
   $('sw-hints').checked = settings.hints;
   $('sw-hints').addEventListener('change', (e) => { settings.hints = e.target.checked; save(); renderBoard(); });
 
-  function applyTheme() { document.documentElement.dataset.theme = settings.theme; }
+  function applyTheme() {
+    document.documentElement.dataset.theme = settings.theme;
+    document.documentElement.dataset.accent = settings.accent;
+    document.querySelectorAll('#swatches .swatch').forEach((b) => {
+      b.classList.toggle('on', b.dataset.accent === settings.accent);
+      b.title = t('c_' + b.dataset.accent);
+    });
+  }
+  $('swatches').addEventListener('click', (e) => {
+    const b = e.target.closest('.swatch');
+    if (!b) return;
+    settings.accent = b.dataset.accent; save(); applyTheme();
+  });
   $('sw-theme').checked = settings.theme === 'dark';
   $('sw-theme').addEventListener('change', (e) => { settings.theme = e.target.checked ? 'dark' : 'light'; save(); applyTheme(); });
 

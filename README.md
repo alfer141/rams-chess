@@ -22,7 +22,8 @@ python3 -m http.server 8765
 
 | Función | Detalle |
 | --- | --- |
-| **Navegación global** | Barra superior con dos secciones, *Jugar* y *Aprender*, y un botón de ajustes (ayudas, tema, sonido, idioma, borrar progreso). |
+| **Navegación global** | Barra superior con dos secciones, *Jugar* y *Aprender*, y un botón de ajustes (ayudas, tema, sonido, color de acento, idioma, borrar progreso). |
+| **Color de acento** | Cinco pastillas al estilo Braun: amarillo, naranja, rojo, oliva y azul. Cambia botones, interruptores, estrellas y marcas. |
 | **Aprender** | 15 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado) y avanzado (valor de las piezas, mates típicos). El progreso se guarda. |
 | **Máquina vs Usuario** | Cinco niveles: Principiante, Fácil, Medio, Difícil y Experto. Puedes elegir blancas, negras o al azar. |
 | **Usuario vs Usuario** | Dos personas en el mismo dispositivo. |

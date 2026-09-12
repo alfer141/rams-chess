@@ -22,6 +22,7 @@
   --hint: rgba(60, 60, 60, 0.28);
   --accent: #f2a900;
   --accent-ink: #1e1e1e;
+  --accent-edge: #c98b00;
   --accent-soft: #3f9a6a;
   --btn: #e1dfda;
   --btn-edge: #c9c7c1;
@@ -54,6 +55,7 @@
   --hint: rgba(30, 30, 30, 0.35);
   --accent: #f4b400;
   --accent-ink: #1e1e1e;
+  --accent-edge: #c98b00;
   --accent-soft: #f4b400;
   --btn: #5f6266;
   --btn-edge: #4a4d51;
@@ -66,6 +68,14 @@
   --shadow-piece: rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }
+
+/* Colores de acento (Ajustes) */
+:root[data-accent="orange"] { --accent: #ed8008; --accent-ink: #1e1e1e; --accent-edge: #b86104; }
+:root[data-accent="red"]    { --accent: #d9331a; --accent-ink: #ffffff; --accent-edge: #a02412; }
+:root[data-accent="olive"]  { --accent: #8a8226; --accent-ink: #ffffff; --accent-edge: #5f5a17; }
+:root[data-accent="blue"]   { --accent: #2f6fb5; --accent-ink: #ffffff; --accent-edge: #204f85; }
+[data-theme="dark"][data-accent="orange"], [data-theme="dark"][data-accent="red"],
+[data-theme="dark"][data-accent="olive"], [data-theme="dark"][data-accent="blue"] { --accent-soft: var(--accent); }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -345,7 +355,7 @@ button { font: inherit; cursor: pointer; }
 .ctl:active .ctl-icon { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 var(--btn-edge), 0 1px 2px rgba(0,0,0,0.18); }
 .ctl:disabled { opacity: 0.4; cursor: default; }
 .ctl:disabled .ctl-icon { filter: none; transform: none; }
-.ctl.accent .ctl-icon { background: var(--accent); color: var(--accent-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 0 #c98b00, 0 3px 6px rgba(0,0,0,0.2); }
+.ctl.accent .ctl-icon { background: var(--accent); color: var(--accent-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 0 var(--accent-edge), 0 3px 6px rgba(0,0,0,0.2); }
 .ctl-label { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; }
 
 /* ---------- Interruptores ---------- */
@@ -408,7 +418,7 @@ button { font: inherit; cursor: pointer; }
 .field-label { display: block; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-soft); margin-bottom: 8px; }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
 .btn { border: 0; border-radius: 999px; padding: 11px 20px; font-size: 14px; font-weight: 600; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); box-shadow: inset 0 -2px 0 #c98b00; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); box-shadow: inset 0 -2px 0 var(--accent-edge); }
 .btn.ghost { background: var(--btn); color: var(--text); box-shadow: inset 0 -2px 0 var(--btn-edge); }
 .btn:active { transform: translateY(1px); }
 
@@ -509,3 +519,22 @@ button { font: inherit; cursor: pointer; }
 .lesson-feedback.err { color: #d2452e; }
 .controls-2 { grid-template-columns: repeat(2, 1fr); max-width: 220px; margin-left: auto; margin-right: auto; }
 .ctl.accent:disabled .ctl-icon { background: var(--btn); color: var(--btn-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 0 var(--btn-edge), 0 3px 6px rgba(0,0,0,0.18); }
+
+/* ---------- Selector de acento ---------- */
+.swatches { display: flex; gap: 14px; }
+.swatch {
+  width: 38px; height: 38px; border-radius: 50%; border: 0; padding: 0;
+  background: var(--c);
+  box-shadow:
+    inset 0 3px 4px rgba(255,255,255,0.35),
+    inset 0 -4px 5px rgba(0,0,0,0.28),
+    0 2px 3px rgba(0,0,0,0.35);
+  position: relative;
+  transition: transform 0.1s;
+}
+.swatch:hover { transform: translateY(-1px); }
+.swatch:active { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.3), 0 1px 1px rgba(0,0,0,0.3); }
+.swatch.on::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  border: 2px solid var(--text);
+}
