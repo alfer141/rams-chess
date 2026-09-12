@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rams Chess</title>
-  <meta name="description" content="Ajedrez para aprender, con diseño inspirado en Dieter Rams. Juega contra la máquina o contra otra persona.">
+  <meta name="description" content="Ajedrez para aprender, con diseño inspirado en Dieter Rams. Juega contra la máquina o contra otra persona y completa lecciones interactivas.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%23e9e7e2'/><circle cx='50' cy='50' r='22' fill='%23f2a900'/></svg>">
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -50,13 +50,34 @@
       <path d="M34 58 Q30 34 50 32 Q70 34 66 58 Z"/>
       <path d="M46 10 L54 10 L54 18 L62 18 L62 26 L54 26 L54 34 L46 34 L46 26 L38 26 L38 18 L46 18 Z"/>
     </symbol>
+    <symbol id="ic-star" viewBox="0 0 24 24">
+      <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/>
+    </symbol>
+    <symbol id="ic-check" viewBox="0 0 24 24">
+      <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
   </defs>
 </svg>
 
 <main class="device" id="device">
-  <header class="brand"><span data-i18n="brand">RAMS CHESS</span></header>
+  <!-- ====== Barra global ====== -->
+  <header class="topbar">
+    <nav class="nav" id="nav" aria-label="Secciones">
+      <button type="button" data-view="play" class="on" data-i18n="nav_play">Jugar</button>
+      <button type="button" data-view="learn" data-i18n="nav_learn">Aprender</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="brand" data-i18n="brand">RAMS CHESS</span>
+      <button type="button" class="gear" id="btn-settings" aria-label="Ajustes" title="Ajustes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3.2"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
 
-  <!-- ====== Tablero ====== -->
+  <!-- ====== Tablero (compartido por Jugar y Aprender) ====== -->
   <section class="board-area">
     <div class="ranks" id="ranks"></div>
     <div class="board-frame">
@@ -65,8 +86,8 @@
     <div class="files" id="files"></div>
   </section>
 
-  <!-- ====== Panel ====== -->
-  <aside class="panel">
+  <!-- ====== Panel: Jugar ====== -->
+  <aside class="panel" id="panel-play">
     <div class="player" id="player-top" data-color="b">
       <div class="who">
         <div class="name"><span class="dot"></span><span class="label" data-i18n="black">Negras</span><span class="tag" id="tag-top"></span></div>
@@ -118,7 +139,58 @@
         <span class="ctl-label" data-i18n="newgame">Nueva partida</span>
       </button>
     </div>
+  </aside>
 
+  <!-- ====== Panel: Aprender ====== -->
+  <aside class="panel" id="panel-learn" hidden>
+    <div id="learn-list">
+      <div class="learn-head">
+        <h2 data-i18n="learn_title">Aprender a jugar</h2>
+        <p class="muted" data-i18n="learn_intro">Lecciones cortas e interactivas. Empieza por las piezas y sigue en orden.</p>
+      </div>
+      <div class="lesson-groups" id="lesson-groups"></div>
+    </div>
+
+    <div id="learn-stage" hidden>
+      <button type="button" class="link-back" id="learn-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        <span data-i18n="lessons">Lecciones</span>
+      </button>
+      <div class="lesson-title">
+        <span class="lesson-icon" id="lesson-icon"></span>
+        <div>
+          <h2 id="lesson-title"></h2>
+          <div class="stage-dots" id="stage-dots"></div>
+        </div>
+      </div>
+      <p class="muted" id="lesson-intro"></p>
+      <div class="rule"></div>
+      <div class="hint-line" id="lesson-text"></div>
+      <div class="lesson-feedback" id="lesson-feedback"></div>
+      <div class="rule"></div>
+      <div class="controls controls-2">
+        <button class="ctl" id="btn-restart" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v5h5"/></svg></span>
+          <span class="ctl-label" data-i18n="restart">Reiniciar</span>
+        </button>
+        <button class="ctl accent" id="btn-next" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>
+          <span class="ctl-label" data-i18n="next">Siguiente</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer class="foot">
+  <span data-i18n="footer">Diseño inspirado en Dieter Rams · Menos, pero mejor.</span>
+  <a id="repo-link" href="https://github.com/alfer141/rams-chess" target="_blank" rel="noopener">GitHub</a>
+</footer>
+
+<!-- ====== Diálogo: ajustes globales ====== -->
+<dialog id="dlg-settings" class="dlg">
+  <div class="dlg-body">
+    <h2 data-i18n="settings">Ajustes</h2>
     <div class="switches">
       <label class="switch-row">
         <span data-i18n="hints">Mostrar movimientos posibles</span>
@@ -143,13 +215,12 @@
         </div>
       </div>
     </div>
-  </aside>
-</main>
-
-<footer class="foot">
-  <span data-i18n="footer">Diseño inspirado en Dieter Rams · Menos, pero mejor.</span>
-  <a id="repo-link" href="https://github.com/alfer141/rams-chess" target="_blank" rel="noopener">GitHub</a>
-</footer>
+    <div class="dlg-actions">
+      <button type="button" class="btn ghost" id="btn-reset-progress" data-i18n="reset_progress">Borrar progreso</button>
+      <button type="button" class="btn primary" id="dlg-settings-close" data-i18n="close">Cerrar</button>
+    </div>
+  </div>
+</dialog>
 
 <!-- ====== Diálogo: nueva partida ====== -->
 <dialog id="dlg-new" class="dlg">
@@ -232,6 +303,7 @@
 <script src="js/engine.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/lessons.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

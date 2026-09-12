@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "python3 -m http.server 8765",
-    "test": "node test/perft.js"
+    "test": "node test/perft.js && node test/lessons.js"
   },
   "license": "MIT"
 }

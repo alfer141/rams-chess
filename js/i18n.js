@@ -35,6 +35,22 @@
       tip_ep: 'Captura al paso disponible: el peón puede capturar al peón rival que acaba de avanzar dos casillas.',
       tip_none: 'Esta pieza no tiene movimientos legales ahora mismo.',
       welcome: 'Toca una pieza para ver a dónde puede moverse.',
+      nav_play: 'Jugar', nav_learn: 'Aprender', settings: 'Ajustes', reset_progress: 'Borrar progreso',
+      learn_title: 'Aprender a jugar', learn_intro: 'Lecciones cortas e interactivas. Empieza por las piezas y sigue en orden.',
+      lessons: 'Lecciones', restart: 'Reiniciar', next: 'Siguiente', finish: 'Terminar', stage: 'Etapa',
+      pick_lesson: 'Elige una lección en el panel para empezar.',
+      great: '¡Muy bien!', in_moves: 'en {n} jugadas', in_move: 'en 1 jugada', par_hint: 'Se puede en {n}.',
+      lesson_done: '¡Lección completada!', all_done: 'Has completado todas las lecciones. ¡A jugar!',
+      try_again: 'Inténtalo de nuevo.',
+      not_check: 'Esa jugada no da jaque al rey.', not_mate: 'Es jaque, pero el rey puede escapar. Busca el mate.',
+      stalemate_oops: '¡Ahogado! El rey no está en jaque y no puede moverse: son tablas. Busca el mate.',
+      not_castle: 'Eso no es un enroque: el rey debe moverse dos casillas hacia la torre.',
+      not_ep: 'Eso no es una captura al paso. Captura el peón que acaba de avanzar dos casillas.',
+      not_promote: 'Lleva el peón hasta la última fila.',
+      not_safe_piece: 'Mueve la pieza que está atacada.', not_safe: 'Esa casilla sigue atacada por el rival.',
+      not_value: 'Hay una captura más valiosa. Recuerda: dama 9, torre 5, alfil y caballo 3, peón 1.',
+      stars_left: 'Estrellas restantes: {n}', pieces_left: 'Piezas por capturar: {n}',
+      completed: 'Completado', progress_reset: 'Progreso borrado.',
       piece_names: { p: 'peón', n: 'caballo', b: 'alfil', r: 'torre', q: 'dama', k: 'rey' },
     },
     en: {
@@ -69,11 +85,31 @@
       tip_ep: 'En passant available: capture the enemy pawn that just advanced two squares.',
       tip_none: 'This piece has no legal moves right now.',
       welcome: 'Tap a piece to see where it can move.',
+      nav_play: 'Play', nav_learn: 'Learn', settings: 'Settings', reset_progress: 'Reset progress',
+      learn_title: 'Learn to play', learn_intro: 'Short interactive lessons. Start with the pieces and follow the order.',
+      lessons: 'Lessons', restart: 'Restart', next: 'Next', finish: 'Finish', stage: 'Stage',
+      pick_lesson: 'Pick a lesson in the panel to begin.',
+      great: 'Well done!', in_moves: 'in {n} moves', in_move: 'in 1 move', par_hint: 'It can be done in {n}.',
+      lesson_done: 'Lesson complete!', all_done: 'You have completed every lesson. Go play!',
+      try_again: 'Try again.',
+      not_check: 'That move does not give check.', not_mate: 'It is check, but the king can escape. Find the mate.',
+      stalemate_oops: 'Stalemate! The king is not in check and cannot move: a draw. Find the mate instead.',
+      not_castle: 'That is not castling: the king must move two squares toward the rook.',
+      not_ep: 'That is not en passant. Capture the pawn that just advanced two squares.',
+      not_promote: 'Take the pawn all the way to the last rank.',
+      not_safe_piece: 'Move the piece that is under attack.', not_safe: 'That square is still attacked.',
+      not_value: 'There is a more valuable capture. Remember: queen 9, rook 5, bishop and knight 3, pawn 1.',
+      stars_left: 'Stars left: {n}', pieces_left: 'Pieces left to capture: {n}',
+      completed: 'Completed', progress_reset: 'Progress cleared.',
       piece_names: { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' },
     },
   };
   let lang = 'es';
-  const t = (key) => (T[lang][key] !== undefined ? T[lang][key] : (T.es[key] !== undefined ? T.es[key] : key));
+  const t = (key, vars) => {
+    let v = T[lang][key] !== undefined ? T[lang][key] : (T.es[key] !== undefined ? T.es[key] : key);
+    if (vars && typeof v === 'string') for (const k in vars) v = v.replace('{' + k + '}', vars[k]);
+    return v;
+  };
   function apply() {
     document.documentElement.lang = lang;
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });

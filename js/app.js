@@ -1,38 +1,51 @@
 /* ============================================================
-   app.js — Interfaz y flujo de la partida
+   app.js — Interfaz y flujo: Jugar, Aprender y ajustes globales
    ============================================================ */
 (function () {
   'use strict';
 
-  const { fileOf, rankOf, toAlg, FILES, PIECE_VALUE } = ChessUtil;
-  const t = (k) => I18N.t(k);
+  const { fileOf, rankOf, fromAlg, FILES } = ChessUtil;
+  const t = (k, v) => I18N.t(k, v);
   const $ = (id) => document.getElementById(id);
+  const L = (obj) => (obj ? obj[I18N.lang] || obj.es : '');
 
   /* ---------- Estado ---------- */
-  const game = new Chess();
+  const playGame = new Chess();
+  const learnGame = new Chess();
+  let game = playGame;              // partida activa según la vista
+  let view = 'play';                // 'play' | 'learn'
+
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5,
     hints: true, theme: 'light', sound: true, lang: 'es',
   }, load('rams-chess-settings'));
+  let progress = load('rams-chess-progress');   // { lessonId: etapas completadas }
 
   const state = {
-    humanColor: 'w',        // en modo máquina, el color del humano
+    humanColor: 'w',
     flipped: false,
     selected: -1,
     targets: [],
     lastMove: null,
-    over: null,             // { result, reason }
+    over: null,
     paused: false,
     clocks: { w: 0, b: 0 },
     clockOn: false,
     lastTick: 0,
     thinking: false,
     aiRequest: 0,
-    log: [],                // [{san, color}]
+    log: [],
   };
 
+  const learn = { lesson: null, stage: 0, color: 'w', stars: new Set(), moves: 0, done: false, busy: false, feedback: '', feedbackKind: '' };
+
   function load(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } }
-  function save() { try { localStorage.setItem('rams-chess-settings', JSON.stringify(settings)); } catch (e) { /* sin almacenamiento */ } }
+  function save() {
+    try {
+      localStorage.setItem('rams-chess-settings', JSON.stringify(settings));
+      localStorage.setItem('rams-chess-progress', JSON.stringify(progress));
+    } catch (e) { /* sin almacenamiento */ }
+  }
 
   /* ---------- Sonido (WebAudio, sin archivos) ---------- */
   let audio = null;
@@ -53,6 +66,9 @@
     capture: () => { beep(320, 0.1, 'square', 0.06); setTimeout(() => beep(240, 0.12, 'square', 0.05), 60); },
     check: () => { beep(880, 0.1); setTimeout(() => beep(1100, 0.14), 90); },
     end: () => { beep(440, 0.2); setTimeout(() => beep(330, 0.3), 180); },
+    star: () => { beep(988, 0.09); setTimeout(() => beep(1319, 0.12), 70); },
+    success: () => { beep(660, 0.1); setTimeout(() => beep(880, 0.1), 100); setTimeout(() => beep(1320, 0.22), 200); },
+    fail: () => beep(180, 0.22, 'sawtooth', 0.04),
   };
 
   /* ---------- IA (Web Worker con respaldo síncrono) ---------- */
@@ -66,11 +82,11 @@
     const id = ++state.aiRequest;
     state.thinking = true;
     renderStatus();
-    const fen = game.fen();
+    const fen = playGame.fen();
     const started = Date.now();
     const deliver = (m) => {
-      if (id !== state.aiRequest) return;             // petición cancelada (deshacer, nueva partida…)
-      const wait = Math.max(0, 450 - (Date.now() - started)); // pequeña pausa para que se vea natural
+      if (id !== state.aiRequest) return;
+      const wait = Math.max(0, 450 - (Date.now() - started));
       setTimeout(() => {
         if (id !== state.aiRequest) return;
         state.thinking = false;
@@ -82,16 +98,20 @@
       worker.postMessage({ id, fen, level: settings.level });
     } else {
       setTimeout(() => {
-        const r = ChessAI.chooseMove(game, settings.level);
+        const r = ChessAI.chooseMove(playGame, settings.level);
         deliver(r ? { from: r.move.from, to: r.move.to, promotion: r.move.promotion || null } : null);
       }, 30);
     }
   }
+  function cancelAI() { state.aiRequest++; state.thinking = false; }
 
   const isAIMode = () => settings.mode === 'ai';
   const machineColor = () => (state.humanColor === 'w' ? 'b' : 'w');
-  const humanToMove = () => !isAIMode() || game.turn === state.humanColor;
-  const canInteract = () => !state.over && !state.paused && !state.thinking && humanToMove();
+  const machineToMove = () => view === 'play' && isAIMode() && playGame.turn === machineColor() && !state.over && !state.paused;
+  function canInteract() {
+    if (view === 'learn') return !!learn.lesson && !learn.done && !learn.busy && game.turn === learn.color;
+    return !state.over && !state.paused && !state.thinking && (!isAIMode() || game.turn === state.humanColor);
+  }
 
   /* ---------- Tablero ---------- */
   const boardEl = $('board');
@@ -108,7 +128,6 @@
     }
     const order = state.flipped ? [...Array(64).keys()].reverse() : [...Array(64).keys()];
     order.forEach((i) => boardEl.appendChild(squares[i]));
-    // coordenadas
     const ranks = state.flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
     const files = state.flipped ? [...FILES].reverse() : [...FILES];
     $('ranks').innerHTML = ranks.map((r) => `<span>${r}</span>`).join('');
@@ -128,6 +147,7 @@
       el.classList.toggle('last', !!state.lastMove && (state.lastMove.from === i || state.lastMove.to === i));
       el.classList.toggle('selected', state.selected === i);
       el.classList.toggle('check', kingInCheck === i);
+      el.classList.toggle('star', view === 'learn' && learn.stars.has(i));
       const target = settings.hints ? state.targets.find((m) => m.to === i) : null;
       el.classList.toggle('hint', !!target);
       el.classList.toggle('capture', !!target && !!target.captured);
@@ -135,7 +155,7 @@
     }
   }
 
-  /* ---------- Panel ---------- */
+  /* ---------- Panel: Jugar ---------- */
   function fmtClock(ms) {
     const s = Math.max(0, Math.ceil(ms / 1000));
     return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -150,8 +170,8 @@
       el.classList.toggle('low', state.clocks[color] < 30000 && state.clocks[color] > 0);
     };
     set('clock-top', top); set('clock-bottom', bottom);
-    $('player-top').classList.toggle('active', game.turn === top && !state.over);
-    $('player-bottom').classList.toggle('active', game.turn === bottom && !state.over);
+    $('player-top').classList.toggle('active', playGame.turn === top && !state.over);
+    $('player-bottom').classList.toggle('active', playGame.turn === bottom && !state.over);
   }
 
   function renderPlayers() {
@@ -164,12 +184,11 @@
     $('tag-top').textContent = tag(top);
     $('tag-bottom').textContent = tag(bottom);
 
-    const cap = game.captured();  // cap.w = piezas negras capturadas por blancas
+    const cap = playGame.captured();
     const capHTML = (color) => {
-      const list = cap[color];
       const victim = color === 'w' ? 'b' : 'w';
-      let html = list.map((type) => `<span class="cap ${victim}"><svg><use href="#pc-${type}"/></svg></span>`).join('');
-      const bal = game.materialBalance() * (color === 'w' ? 1 : -1);
+      let html = cap[color].map((type) => `<span class="cap ${victim}"><svg><use href="#pc-${type}"/></svg></span>`).join('');
+      const bal = playGame.materialBalance() * (color === 'w' ? 1 : -1);
       if (bal > 0) html += `<span class="adv">+${bal}</span>`;
       return html;
     };
@@ -194,41 +213,44 @@
     ol.scrollTop = ol.scrollHeight;
   }
 
+  function pieceTip(p, targets) {
+    let txt = t('tip_' + p.type);
+    if (p.type === 'k' && targets.some((m) => m.castle)) txt += ' ' + t('tip_castle');
+    if (p.type === 'p' && targets.some((m) => m.enPassant)) txt += ' ' + t('tip_ep');
+    if (!targets.length) txt = t('tip_none');
+    return txt;
+  }
+
   function renderStatus() {
+    if (view !== 'play') return;
     const line = $('hint-line');
     line.classList.remove('alert');
-    if (state.over) {
-      line.textContent = resultText(state.over);
-      return;
-    }
+    if (state.over) { line.textContent = resultText(state.over); return; }
     if (state.thinking) { line.textContent = t('thinking'); return; }
-    if (state.selected >= 0) {
-      const p = game.get(state.selected);
-      let txt = t('tip_' + p.type);
-      if (p.type === 'k' && state.targets.some((m) => m.castle)) txt += ' ' + t('tip_castle');
-      if (p.type === 'p' && state.targets.some((m) => m.enPassant)) txt += ' ' + t('tip_ep');
-      if (!state.targets.length) txt = t('tip_none');
-      line.textContent = txt;
-      return;
-    }
+    if (state.selected >= 0) { line.textContent = pieceTip(game.get(state.selected), state.targets); return; }
     if (game.inCheck()) { line.textContent = t('check'); line.classList.add('alert'); return; }
     line.textContent = state.log.length ? t(game.turn === 'w' ? 'turn_w' : 'turn_b') : t('welcome');
   }
 
   function renderButtons() {
-    $('btn-undo').disabled = game.history.length === 0 || state.paused;
+    $('btn-undo').disabled = playGame.history.length === 0 || state.paused;
     $('btn-resign').disabled = !!state.over || state.paused;
-    $('btn-pause').disabled = !!state.over || game.history.length === 0;
+    $('btn-pause').disabled = !!state.over || playGame.history.length === 0;
   }
 
-  function renderAll() { renderBoard(); renderPlayers(); renderMoves(); renderClocks(); renderStatus(); renderButtons(); }
+  function renderPlayPanel() { renderPlayers(); renderMoves(); renderClocks(); renderStatus(); renderButtons(); }
+
+  function renderAll() {
+    renderBoard();
+    if (view === 'play') renderPlayPanel(); else renderLearn();
+  }
 
   function resultText(over) {
     const who = over.result === '1-0' ? t('win_w') : over.result === '0-1' ? t('win_b') : t('draw');
     return `${who} ${t('r_' + over.reason)}`;
   }
 
-  /* ---------- Movimientos ---------- */
+  /* ---------- Movimientos (comunes) ---------- */
   function select(i) {
     state.selected = i;
     state.targets = i >= 0 ? game.movesFrom(i) : [];
@@ -249,17 +271,18 @@
   function applyMove(m) {
     const done = game.move(m);
     if (!done) return false;
-    state.log.push({ san: done.san, color: done.color });
     state.lastMove = done;
     state.selected = -1; state.targets = [];
-    if (settings.time > 0 && !state.clockOn) { state.clockOn = true; state.lastTick = Date.now(); }
+    if (view === 'learn') { learnMove(done); return true; }
 
+    state.log.push({ san: done.san, color: done.color });
+    if (settings.time > 0 && !state.clockOn) { state.clockOn = true; state.lastTick = Date.now(); }
     const st = game.status();
     if (st.over) { endGame(st.result, st.reason); }
     else {
       if (game.inCheck()) sfx.check(); else if (done.captured) sfx.capture(); else sfx.move();
       renderAll();
-      if (isAIMode() && game.turn === machineColor()) requestAIMove();
+      if (machineToMove()) requestAIMove();
     }
     return true;
   }
@@ -267,7 +290,7 @@
   function endGame(result, reason) {
     state.over = { result, reason };
     state.clockOn = false;
-    state.thinking = false; state.aiRequest++;
+    cancelAI();
     state.selected = -1; state.targets = [];
     sfx.end();
     renderAll();
@@ -275,18 +298,17 @@
   }
 
   function undo() {
-    if (!game.history.length) return;
-    state.aiRequest++; state.thinking = false;
+    if (view === 'learn') { if (learn.lesson) loadStage(learn.stage); return; }
+    if (!playGame.history.length) return;
+    cancelAI();
     let plies = 1;
-    if (isAIMode() && game.turn === state.humanColor && game.history.length >= 2) plies = 2;
-    if (isAIMode() && game.turn === machineColor() && state.over) plies = 1;
-    for (let k = 0; k < plies; k++) { if (game.undo()) state.log.pop(); }
+    if (isAIMode() && playGame.turn === state.humanColor && playGame.history.length >= 2) plies = 2;
+    for (let k = 0; k < plies; k++) { if (playGame.undo()) state.log.pop(); }
     state.over = null;
-    state.lastMove = game.history.length ? game.history[game.history.length - 1].move : null;
+    state.lastMove = playGame.history.length ? playGame.history[playGame.history.length - 1].move : null;
     state.selected = -1; state.targets = [];
     renderAll();
-    // si tras deshacer le toca a la máquina (p. ej. deshacer con una sola jugada), que juegue
-    if (isAIMode() && game.turn === machineColor() && !state.paused) requestAIMove();
+    if (machineToMove()) requestAIMove();
   }
 
   /* ---------- Interacción: clic y arrastre ---------- */
@@ -378,13 +400,13 @@
 
   /* ---------- Reloj ---------- */
   setInterval(() => {
-    if (!state.clockOn || state.paused || state.over) { state.lastTick = Date.now(); return; }
+    if (!state.clockOn || state.paused || state.over || view !== 'play') { state.lastTick = Date.now(); return; }
     const now = Date.now();
     const elapsed = now - state.lastTick; state.lastTick = now;
-    state.clocks[game.turn] -= elapsed;
-    if (state.clocks[game.turn] <= 0) {
-      state.clocks[game.turn] = 0;
-      endGame(game.turn === 'w' ? '0-1' : '1-0', 'time');
+    state.clocks[playGame.turn] -= elapsed;
+    if (state.clocks[playGame.turn] <= 0) {
+      state.clocks[playGame.turn] = 0;
+      endGame(playGame.turn === 'w' ? '0-1' : '1-0', 'time');
       return;
     }
     renderClocks();
@@ -396,15 +418,15 @@
     $('pause-veil').hidden = !on;
     state.lastTick = Date.now();
     renderButtons();
-    if (!on && isAIMode() && game.turn === machineColor() && !state.thinking && !state.over) requestAIMove();
+    if (!on && machineToMove() && !state.thinking) requestAIMove();
   }
   $('btn-pause').addEventListener('click', () => setPaused(true));
   $('btn-resume').addEventListener('click', () => setPaused(false));
 
   /* ---------- Nueva partida ---------- */
   function newGame() {
-    state.aiRequest++; state.thinking = false;
-    game.reset();
+    cancelAI();
+    playGame.reset();
     state.log = []; state.lastMove = null; state.over = null; state.paused = false;
     state.selected = -1; state.targets = [];
     $('pause-veil').hidden = true;
@@ -412,9 +434,7 @@
     state.flipped = isAIMode() && state.humanColor === 'b';
     state.clocks = { w: settings.time * 60000, b: settings.time * 60000 };
     state.clockOn = false;
-    buildBoard();
-    renderAll();
-    if (isAIMode() && game.turn === machineColor()) requestAIMove();
+    if (view === 'play') { buildBoard(); renderAll(); if (machineToMove()) requestAIMove(); }
   }
 
   function segValue(id) { return document.querySelector(`#${id} button.on`).dataset.v; }
@@ -428,7 +448,7 @@
       seg.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
       if (seg.id === 'seg-mode') updateModeFields();
-      if (seg.id === 'lang-seg') { settings.lang = b.dataset.lang; save(); I18N.set(settings.lang); renderAll(); }
+      if (seg.id === 'lang-seg') { settings.lang = b.dataset.lang; save(); I18N.set(settings.lang); renderAll(); renderLessonList(); }
     });
   });
   function updateModeFields() {
@@ -451,6 +471,7 @@
     settings.time = +segValue('seg-time');
     save();
     $('dlg-new').close();
+    if (view !== 'play') setView('play', true);
     newGame();
   });
 
@@ -458,13 +479,21 @@
   $('btn-resign').addEventListener('click', () => {
     if (state.over) return;
     showMessage(t('resign_title'), t('resign_body'), t('resign'), () => {
-      const loser = isAIMode() ? state.humanColor : game.turn;
+      const loser = isAIMode() ? state.humanColor : playGame.turn;
       endGame(loser === 'w' ? '0-1' : '1-0', 'resign');
     }, t('cancel'));
   });
   $('btn-undo').addEventListener('click', undo);
 
-  /* ---------- Interruptores ---------- */
+  /* ---------- Ajustes globales ---------- */
+  $('btn-settings').addEventListener('click', () => $('dlg-settings').showModal());
+  $('dlg-settings-close').addEventListener('click', () => $('dlg-settings').close());
+  $('btn-reset-progress').addEventListener('click', () => {
+    progress = {}; save(); renderLessonList();
+    $('btn-reset-progress').textContent = t('progress_reset');
+    setTimeout(() => { $('btn-reset-progress').textContent = t('reset_progress'); }, 1500);
+  });
+
   $('sw-hints').checked = settings.hints;
   $('sw-hints').addEventListener('change', (e) => { settings.hints = e.target.checked; save(); renderBoard(); });
 
@@ -477,6 +506,193 @@
 
   document.querySelectorAll('#lang-seg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === settings.lang));
 
+  /* ---------- Navegación global ---------- */
+  function setView(v, silent) {
+    if (v === view && !silent) return;
+    view = v;
+    document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
+    $('panel-play').hidden = v !== 'play';
+    $('panel-learn').hidden = v !== 'learn';
+    state.selected = -1; state.targets = [];
+    if (v === 'play') {
+      game = playGame;
+      state.flipped = isAIMode() && state.humanColor === 'b';
+      state.lastMove = playGame.history.length ? playGame.history[playGame.history.length - 1].move : null;
+      state.lastTick = Date.now();
+      buildBoard(); renderAll();
+      if (machineToMove() && !state.thinking) requestAIMove();
+    } else {
+      cancelAI();
+      game = learnGame;
+      if (learn.lesson) loadStage(learn.stage);
+      else {
+        learnGame.reset();
+        state.flipped = false; state.lastMove = null;
+        buildBoard(); renderAll();
+      }
+    }
+  }
+  $('nav').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-view]');
+    if (b) setView(b.dataset.view);
+  });
+
+  /* ---------- Aprender ---------- */
+  const lessonById = (id) => LESSONS.lessons.find((l) => l.id === id);
+  const stage = () => learn.lesson.stages[learn.stage];
+  const lessonDone = (l) => (progress[l.id] || 0) >= l.stages.length;
+
+  function renderLessonList() {
+    const box = $('lesson-groups');
+    box.innerHTML = '';
+    for (const g of LESSONS.groups) {
+      const title = document.createElement('div');
+      title.className = 'lesson-group-title';
+      title.textContent = L(g.title);
+      box.appendChild(title);
+      for (const les of LESSONS.lessons.filter((l) => l.group === g.id)) {
+        const doneN = progress[les.id] || 0;
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'lesson-item'; btn.dataset.id = les.id;
+        const prog = lessonDone(les)
+          ? `<span class="done"><svg><use href="#ic-check"/></svg></span>`
+          : les.stages.map((_, i) => `<span class="p ${i < doneN ? 'on' : ''}"></span>`).join('');
+        btn.innerHTML = `<span class="lesson-icon"><svg><use href="#pc-${les.piece}"/></svg></span>`
+          + `<span><div class="title">${L(les.title)}</div><div class="sub">${les.stages.length} ${t('stage').toLowerCase()}${les.stages.length > 1 ? 's' : ''}</div></span>`
+          + `<span class="lesson-prog">${prog}</span>`;
+        box.appendChild(btn);
+      }
+    }
+  }
+  $('lesson-groups').addEventListener('click', (e) => {
+    const b = e.target.closest('.lesson-item');
+    if (b) openLesson(b.dataset.id);
+  });
+
+  function openLesson(id) {
+    learn.lesson = lessonById(id);
+    if (!learn.lesson) return;
+    const startAt = Math.min(progress[id] || 0, learn.lesson.stages.length - 1);
+    $('learn-list').hidden = true;
+    $('learn-stage').hidden = false;
+    loadStage(startAt);
+  }
+
+  function closeLesson() {
+    learn.lesson = null;
+    learn.stars = new Set();
+    $('learn-list').hidden = false;
+    $('learn-stage').hidden = true;
+    learnGame.reset();
+    state.flipped = false; state.lastMove = null; state.selected = -1; state.targets = [];
+    buildBoard(); renderAll();
+  }
+  $('learn-back').addEventListener('click', closeLesson);
+
+  function loadStage(i) {
+    learn.stage = i;
+    const st = stage();
+    game = learnGame;
+    learnGame.load(st.fen);
+    learn.color = st.color || 'w';
+    learn.stars = new Set((st.stars || []).map(fromAlg));
+    learn.moves = 0; learn.done = false; learn.busy = false; learn.feedback = ''; learn.feedbackKind = '';
+    state.selected = -1; state.targets = []; state.lastMove = null; state.over = null;
+    state.flipped = learn.color === 'b';
+    buildBoard(); renderAll();
+  }
+
+  function learnMove(m) {
+    const st = stage(); const g = learnGame;
+    const opp = learn.color === 'w' ? 'b' : 'w';
+    learn.moves++;
+    let ok = false, fail = null;
+    switch (st.type) {
+      case 'stars':
+        if (learn.stars.delete(m.to)) sfx.star();
+        ok = learn.stars.size === 0; break;
+      case 'capture':
+        ok = !g.board.some((p) => p && p.color === opp); break;
+      case 'check':
+        if (g.inCheck(opp)) ok = true; else fail = 'not_check'; break;
+      case 'mate':
+        if (g.isCheckmate()) ok = true;
+        else if (g.isStalemate()) fail = 'stalemate_oops';
+        else if (g.inCheck(opp)) fail = 'not_mate';
+        else fail = 'not_check';
+        break;
+      case 'escape': ok = true; break;
+      case 'castle': if (m.castle) ok = true; else fail = 'not_castle'; break;
+      case 'enpassant': if (m.enPassant) ok = true; else fail = 'not_ep'; break;
+      case 'promote': if (m.promotion) ok = true; else fail = 'not_promote'; break;
+      case 'safe': {
+        const tsq = fromAlg(st.target);
+        if (m.from !== tsq) fail = 'not_safe_piece';
+        else if (g.isAttacked(m.to, opp)) fail = 'not_safe';
+        else ok = true;
+        break;
+      }
+      case 'value': if (m.captured === st.target) ok = true; else fail = 'not_value'; break;
+    }
+    // El rival no mueve en las lecciones
+    g.turn = learn.color; g._legalCache = null;
+
+    if (ok) {
+      learn.done = true;
+      sfx.success();
+      const prev = progress[learn.lesson.id] || 0;
+      progress[learn.lesson.id] = Math.max(prev, learn.stage + 1);
+      save();
+      const cnt = learn.moves === 1 ? t('in_move') : t('in_moves', { n: learn.moves });
+      learn.feedback = `${t('great')} ${cnt}.` + (learn.moves > st.par ? ' ' + t('par_hint', { n: st.par }) : '');
+      learn.feedbackKind = 'ok';
+      renderAll();
+    } else if (fail) {
+      learn.busy = true;
+      sfx.fail();
+      learn.feedback = `${t(fail)} ${t('try_again')}`;
+      learn.feedbackKind = 'err';
+      renderAll();
+      setTimeout(() => { if (learn.lesson && learn.busy) loadStage(learn.stage); }, 1400);
+    } else {
+      if (m.captured) sfx.capture(); else if (st.type !== 'stars') sfx.move();
+      if (st.type === 'stars') learn.feedback = t('stars_left', { n: learn.stars.size });
+      if (st.type === 'capture') learn.feedback = t('pieces_left', { n: g.board.filter((p) => p && p.color === opp).length });
+      learn.feedbackKind = '';
+      renderAll();
+    }
+  }
+
+  function renderLearn() {
+    if (!learn.lesson) return;
+    const les = learn.lesson, st = stage();
+    $('lesson-icon').innerHTML = `<svg><use href="#pc-${les.piece}"/></svg>`;
+    $('lesson-title').textContent = L(les.title);
+    $('lesson-intro').textContent = L(les.intro);
+    const doneN = progress[les.id] || 0;
+    $('stage-dots').innerHTML = les.stages.map((_, i) => `<span class="sd ${i < doneN ? 'done' : ''} ${i === learn.stage ? 'cur' : ''}" title="${t('stage')} ${i + 1}"></span>`).join('');
+    $('lesson-text').textContent = L(st.text);
+    const fb = $('lesson-feedback');
+    fb.textContent = learn.feedback;
+    fb.className = 'lesson-feedback ' + learn.feedbackKind;
+    const last = learn.stage === les.stages.length - 1;
+    $('btn-next').disabled = !learn.done;
+    $('btn-next').querySelector('.ctl-label').textContent = last ? t('finish') : t('next');
+  }
+
+  $('btn-restart').addEventListener('click', () => { if (learn.lesson) loadStage(learn.stage); });
+  $('btn-next').addEventListener('click', () => {
+    if (!learn.lesson || !learn.done) return;
+    if (learn.stage + 1 < learn.lesson.stages.length) { loadStage(learn.stage + 1); return; }
+    // lección terminada: pasar a la siguiente pendiente o volver a la lista
+    const all = LESSONS.lessons;
+    const idx = all.indexOf(learn.lesson);
+    const next = all.slice(idx + 1).find((l) => !lessonDone(l)) || all.find((l) => !lessonDone(l));
+    renderLessonList();
+    if (next) { openLesson(next.id); }
+    else { closeLesson(); showMessage(t('lesson_done'), t('all_done'), t('nav_play'), () => setView('play')); }
+  });
+
   /* ---------- Teclado ---------- */
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('dialog')) return;
@@ -487,12 +703,13 @@
   /* ---------- Arranque ---------- */
   applyTheme();
   I18N.set(settings.lang);
+  renderLessonList();
   newGame();
 
-  // API mínima para depurar desde la consola: RamsChess.game.fen(), RamsChess.load('<FEN>')…
+  // API mínima para depurar desde la consola
   window.RamsChess = {
-    game, state, settings,
-    render: renderAll,
-    load(fen) { state.aiRequest++; state.thinking = false; game.load(fen); state.log = []; state.lastMove = null; state.over = null; select(-1); renderAll(); },
+    get game() { return game; }, state, settings, learn,
+    render: renderAll, setView, openLesson,
+    load(fen) { cancelAI(); game.load(fen); state.log = []; state.lastMove = null; state.over = null; select(-1); renderAll(); },
   };
 })();

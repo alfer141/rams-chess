@@ -22,6 +22,8 @@ python3 -m http.server 8765
 
 | Función | Detalle |
 | --- | --- |
+| **Navegación global** | Barra superior con dos secciones, *Jugar* y *Aprender*, y un botón de ajustes (ayudas, tema, sonido, idioma, borrar progreso). |
+| **Aprender** | 15 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado) y avanzado (valor de las piezas, mates típicos). El progreso se guarda. |
 | **Máquina vs Usuario** | Cinco niveles: Principiante, Fácil, Medio, Difícil y Experto. Puedes elegir blancas, negras o al azar. |
 | **Usuario vs Usuario** | Dos personas en el mismo dispositivo. |
 | **Mostrar movimientos posibles** | Interruptor que marca las casillas a las que puede ir la pieza seleccionada y explica cómo se mueve. |
@@ -42,18 +44,21 @@ css/style.css   Estilo: temas, tablero, panel, botones, diálogos
 js/engine.js    Reglas del ajedrez (generación de movimientos legales, SAN, FEN, fin de partida)
 js/ai.js        Motor de la máquina (negamax + alfa-beta + tablas de posición + quiescence)
 js/i18n.js      Textos en español e inglés
-js/app.js       Interfaz, relojes, arrastrar y soltar, diálogos
+js/lessons.js   Lecciones de la sección Aprender (posiciones FEN, tipo de reto, textos)
+js/app.js       Interfaz: vistas Jugar/Aprender, relojes, arrastrar y soltar, diálogos
 test/perft.js   Pruebas del motor (perft contra posiciones estándar)
+test/lessons.js Comprueba que todas las etapas de las lecciones tienen solución
 ```
 
 ## Pruebas
 
 ```bash
-node test/perft.js
+node test/perft.js && node test/lessons.js
 ```
 
-Compara el número de nodos generados con los valores conocidos de posiciones de referencia
+La primera compara el número de nodos generados con los valores conocidos de posiciones de referencia
 (posición inicial, *Kiwipete*, etc.) y comprueba que la máquina encuentra un mate en uno.
+La segunda resuelve cada etapa de cada lección para asegurar que el reto es alcanzable.
 
 ## Desplegar en Vercel
 
