@@ -46,6 +46,7 @@ js/ai.js        Motor de la máquina (negamax + alfa-beta + tablas de posición 
 js/i18n.js      Textos en español e inglés
 js/lessons.js   Lecciones de la sección Aprender (posiciones FEN, tipo de reto, textos)
 js/app.js       Interfaz: vistas Jugar/Aprender, relojes, arrastrar y soltar, diálogos
+audio/          Sonido de interacción de la interfaz (Mixkit, licencia libre)
 test/perft.js   Pruebas del motor (perft contra posiciones estándar)
 test/lessons.js Comprueba que todas las etapas de las lecciones tienen solución
 ```
@@ -73,3 +74,4 @@ npx vercel
 ## Créditos
 
 Diseño original de Alex Fernández, inspirado en los principios de Dieter Rams. Código bajo licencia MIT.
+Sonido de interfaz: "Modern technology select" de [Mixkit](https://mixkit.co/free-sound-effects/) (licencia Mixkit).

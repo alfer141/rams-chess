@@ -61,6 +61,39 @@
       o.start(); o.stop(audio.currentTime + dur);
     } catch (e) { /* sin audio */ }
   }
+  // Sonido de interfaz (audio/ui-select.mp3): se decodifica una vez y se reproduce en cada interacción
+  let uiBuffer = null, uiLoading = false;
+  function loadUISound() {
+    if (uiBuffer || uiLoading) return;
+    uiLoading = true;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      fetch('audio/ui-select.mp3')
+        .then((r) => r.arrayBuffer())
+        .then((buf) => audio.decodeAudioData(buf))
+        .then((decoded) => { uiBuffer = decoded; })
+        .catch(() => { uiLoading = false; });
+    } catch (e) { uiLoading = false; }
+  }
+  function uiClick(gain = 0.5) {
+    if (!settings.sound) return;
+    if (!uiBuffer) { loadUISound(); return; }
+    try {
+      if (audio.state === 'suspended') audio.resume();
+      const src = audio.createBufferSource(), g = audio.createGain();
+      src.buffer = uiBuffer; g.gain.value = gain;
+      src.connect(g).connect(audio.destination);
+      src.start();
+    } catch (e) { /* sin audio */ }
+  }
+  // Botones, interruptores, navegación y lecciones
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b && !b.disabled) uiClick();
+  });
+  document.addEventListener('change', (e) => { if (e.target.classList.contains('switch')) uiClick(0.4); });
+  document.addEventListener('pointerdown', loadUISound, { once: true });
+
   const sfx = {
     move: () => beep(520, 0.08, 'triangle'),
     capture: () => { beep(320, 0.1, 'square', 0.06); setTimeout(() => beep(240, 0.12, 'square', 0.05), 60); },
@@ -319,6 +352,7 @@
     const i = +sq.dataset.i;
     const p = game.get(i);
     if (p && p.color === game.turn) {
+      if (state.selected !== i) uiClick(0.3);
       select(i);
       drag = { from: i, x: e.clientX, y: e.clientY, ghost: null, piece: p, pointerId: e.pointerId };
       try { boardEl.setPointerCapture(e.pointerId); } catch (err) { /* evento sintético */ }
