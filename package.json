@@ -1,0 +1,11 @@
+{
+  "name": "rams-chess",
+  "version": "1.0.0",
+  "description": "Ajedrez para aprender, con diseño inspirado en Dieter Rams.",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 8765",
+    "test": "node test/perft.js"
+  },
+  "license": "MIT"
+}

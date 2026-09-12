@@ -1,0 +1,82 @@
+/* i18n.js — textos en español e inglés */
+(function (global) {
+  'use strict';
+  const T = {
+    es: {
+      brand: 'RAMS CHESS',
+      black: 'Negras', white: 'Blancas', captured: 'Capturadas',
+      pause: 'Pausa', undo: 'Deshacer', resign: 'Rendirse', newgame: 'Nueva partida',
+      hints: 'Mostrar movimientos posibles', theme: 'Tema oscuro', sound: 'Sonido', language: 'Idioma',
+      footer: 'Diseño inspirado en Dieter Rams · Menos, pero mejor.',
+      mode: 'Modalidad', mode_ai: 'Máquina vs Usuario', mode_pvp: 'Usuario vs Usuario',
+      level: 'Dificultad de la máquina', lvl1: 'Principiante', lvl2: 'Fácil', lvl3: 'Medio', lvl4: 'Difícil', lvl5: 'Experto',
+      play_as: 'Juegas con', random: 'Al azar', time: 'Tiempo por jugador', no_time: 'Sin reloj',
+      cancel: 'Cancelar', start: 'Empezar', close: 'Cerrar', ok: 'Aceptar',
+      promote: 'Coronación', promote_help: 'Tu peón llegó al final. Elige en qué pieza se convierte.',
+      paused: 'En pausa', resume: 'Continuar',
+      you: 'Tú', machine: 'Máquina', thinking: 'La máquina está pensando…',
+      turn_w: 'Mueven las blancas', turn_b: 'Mueven las negras',
+      check: '¡Jaque! El rey está amenazado: tienes que protegerlo.',
+      resign_title: '¿Rendirse?', resign_body: 'La partida terminará y tu rival ganará.',
+      over_title: 'Fin de la partida',
+      win_w: 'Ganan las blancas', win_b: 'Ganan las negras', draw: 'Tablas',
+      r_checkmate: 'por jaque mate.', r_stalemate: 'por ahogado: el jugador no tiene movimientos legales y no está en jaque.',
+      r_material: 'por material insuficiente: nadie puede dar mate.', r_repetition: 'por triple repetición de la posición.',
+      r_fifty: 'por la regla de los 50 movimientos sin capturas ni avances de peón.',
+      r_resign: 'por rendición.', r_time: 'por tiempo.',
+      play_again: 'Jugar otra vez',
+      tip_p: 'El peón avanza una casilla (dos desde su posición inicial) y captura en diagonal.',
+      tip_n: 'El caballo se mueve en "L" y es la única pieza que salta sobre otras.',
+      tip_b: 'El alfil se mueve en diagonal tantas casillas como quiera.',
+      tip_r: 'La torre se mueve en línea recta: horizontal o vertical.',
+      tip_q: 'La dama combina torre y alfil: se mueve en cualquier dirección.',
+      tip_k: 'El rey se mueve una casilla en cualquier dirección. Nunca puede quedar en jaque.',
+      tip_castle: 'Enroque disponible: el rey se mueve dos casillas hacia la torre y ésta salta al otro lado.',
+      tip_ep: 'Captura al paso disponible: el peón puede capturar al peón rival que acaba de avanzar dos casillas.',
+      tip_none: 'Esta pieza no tiene movimientos legales ahora mismo.',
+      welcome: 'Toca una pieza para ver a dónde puede moverse.',
+      piece_names: { p: 'peón', n: 'caballo', b: 'alfil', r: 'torre', q: 'dama', k: 'rey' },
+    },
+    en: {
+      brand: 'RAMS CHESS',
+      black: 'Black', white: 'White', captured: 'Captured',
+      pause: 'Pause', undo: 'Undo', resign: 'Resign', newgame: 'New game',
+      hints: 'Show possible moves', theme: 'Dark theme', sound: 'Sound', language: 'Language',
+      footer: 'Design inspired by Dieter Rams · Less, but better.',
+      mode: 'Mode', mode_ai: 'Machine vs Player', mode_pvp: 'Player vs Player',
+      level: 'Machine difficulty', lvl1: 'Beginner', lvl2: 'Easy', lvl3: 'Medium', lvl4: 'Hard', lvl5: 'Expert',
+      play_as: 'Play as', random: 'Random', time: 'Time per player', no_time: 'No clock',
+      cancel: 'Cancel', start: 'Start', close: 'Close', ok: 'OK',
+      promote: 'Promotion', promote_help: 'Your pawn reached the last rank. Choose a piece.',
+      paused: 'Paused', resume: 'Resume',
+      you: 'You', machine: 'Machine', thinking: 'The machine is thinking…',
+      turn_w: 'White to move', turn_b: 'Black to move',
+      check: 'Check! Your king is under attack: you must protect it.',
+      resign_title: 'Resign?', resign_body: 'The game will end and your opponent wins.',
+      over_title: 'Game over',
+      win_w: 'White wins', win_b: 'Black wins', draw: 'Draw',
+      r_checkmate: 'by checkmate.', r_stalemate: 'by stalemate: no legal moves and not in check.',
+      r_material: 'by insufficient material: nobody can checkmate.', r_repetition: 'by threefold repetition.',
+      r_fifty: 'by the fifty-move rule.', r_resign: 'by resignation.', r_time: 'on time.',
+      play_again: 'Play again',
+      tip_p: 'The pawn moves one square forward (two from its start) and captures diagonally.',
+      tip_n: 'The knight moves in an "L" and is the only piece that can jump over others.',
+      tip_b: 'The bishop moves diagonally, as far as it wants.',
+      tip_r: 'The rook moves in straight lines: horizontally or vertically.',
+      tip_q: 'The queen combines rook and bishop: any direction, any distance.',
+      tip_k: 'The king moves one square in any direction. It can never stay in check.',
+      tip_castle: 'Castling available: the king moves two squares toward the rook and the rook jumps over.',
+      tip_ep: 'En passant available: capture the enemy pawn that just advanced two squares.',
+      tip_none: 'This piece has no legal moves right now.',
+      welcome: 'Tap a piece to see where it can move.',
+      piece_names: { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' },
+    },
+  };
+  let lang = 'es';
+  const t = (key) => (T[lang][key] !== undefined ? T[lang][key] : (T.es[key] !== undefined ? T.es[key] : key));
+  function apply() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  }
+  global.I18N = { t, apply, set(l) { if (T[l]) lang = l; apply(); }, get lang() { return lang; } };
+})(window);
