@@ -45,7 +45,8 @@
 
   /* ---- Autenticación ---- */
   async function sendCode(email) {
-    const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    const redirect = global.location.origin + global.location.pathname;
+    const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: redirect } });
     if (error) throw error;
   }
   async function verify(email, token) {
