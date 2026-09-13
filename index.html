@@ -65,9 +65,14 @@
     <nav class="nav" id="nav" aria-label="Secciones">
       <button type="button" data-view="play" class="on" data-i18n="nav_play">Jugar</button>
       <button type="button" data-view="learn" data-i18n="nav_learn">Aprender</button>
+      <button type="button" data-view="history" data-i18n="nav_history">Partidas</button>
     </nav>
     <div class="topbar-right">
       <span class="brand" data-i18n="brand">RAMS CHESS</span>
+      <button type="button" class="gear" id="btn-account" aria-label="Cuenta" title="Cuenta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg>
+        <span class="led" id="acct-led" hidden></span>
+      </button>
       <button type="button" class="gear" id="btn-settings" aria-label="Ajustes" title="Ajustes">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3.2"/>
@@ -103,7 +108,10 @@
 
     <div class="moves-wrap">
       <ol class="moves" id="moves"></ol>
-      <div class="hint-line" id="hint-line"></div>
+      <div class="display">
+        <div class="screen mono" id="hint-line"></div>
+        <div class="module-label" data-i18n="display">Display</div>
+      </div>
     </div>
 
     <div class="rule"></div>
@@ -139,6 +147,7 @@
         <span class="ctl-label" data-i18n="newgame">Nueva partida</span>
       </button>
     </div>
+    <div class="module-label" data-i18n="keypad">Teclado</div>
   </aside>
 
   <!-- ====== Panel: Aprender ====== -->
@@ -148,7 +157,7 @@
         <h2 data-i18n="learn_title">Aprender a jugar</h2>
         <p class="muted" data-i18n="learn_intro">Lecciones cortas e interactivas. Empieza por las piezas y sigue en orden.</p>
       </div>
-      <div class="xp-card" id="xp-card"></div>
+      <div class="meter" id="xp-card"></div>
       <div class="lesson-groups" id="lesson-groups"></div>
     </div>
 
@@ -166,10 +175,13 @@
         <div class="xp-chip" id="xp-chip"></div>
       </div>
       <p class="muted" id="lesson-intro"></p>
-      <div class="rule"></div>
-      <div class="hint-line" id="lesson-text"></div>
-      <div class="lesson-feedback" id="lesson-feedback"></div>
-      <div class="rule"></div>
+      <div class="display">
+        <div class="screen mono" id="lesson-screen">
+          <div id="lesson-text"></div>
+          <div id="lesson-feedback" class="fb"></div>
+        </div>
+        <div class="module-label" data-i18n="display">Display</div>
+      </div>
       <div class="controls controls-2">
         <button class="ctl" id="btn-restart" type="button">
           <span class="ctl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v5h5"/></svg></span>
@@ -180,6 +192,43 @@
           <span class="ctl-label" data-i18n="next">Siguiente</span>
         </button>
       </div>
+      <div class="module-label" data-i18n="keypad">Teclado</div>
+    </div>
+  </aside>
+
+  <!-- ====== Panel: Partidas ====== -->
+  <aside class="panel" id="panel-history" hidden>
+    <div id="history-list">
+      <div class="learn-head">
+        <h2 data-i18n="history_title">Partidas</h2>
+        <p class="muted" id="history-intro"></p>
+      </div>
+      <div class="game-list" id="game-list"></div>
+    </div>
+    <div id="history-review" hidden>
+      <button type="button" class="link-back" id="history-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        <span data-i18n="history_title">Partidas</span>
+      </button>
+      <div class="display">
+        <div class="screen mono" id="review-screen"></div>
+        <div class="module-label" data-i18n="display">Display</div>
+      </div>
+      <div class="controls controls-3">
+        <button class="ctl" id="btn-rev-start" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="2.5" height="14" rx="1"/><path d="M18 5.5v13l-9-6.5z"/></svg></span>
+          <span class="ctl-label" data-i18n="rev_start">Inicio</span>
+        </button>
+        <button class="ctl" id="btn-rev-prev" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24"><path d="M17 5.5v13l-10-6.5z"/></svg></span>
+          <span class="ctl-label" data-i18n="rev_prev">Anterior</span>
+        </button>
+        <button class="ctl accent" id="btn-rev-next" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24"><path d="M7 5.5v13l10-6.5z"/></svg></span>
+          <span class="ctl-label" data-i18n="rev_next">Siguiente</span>
+        </button>
+      </div>
+      <div class="module-label" data-i18n="playback">Reproducción</div>
     </div>
   </aside>
 </main>
@@ -188,6 +237,42 @@
   <span data-i18n="footer">Diseño inspirado en Dieter Rams · Menos, pero mejor.</span>
   <a id="repo-link" href="https://github.com/alfer141/rams-chess" target="_blank" rel="noopener">GitHub</a>
 </footer>
+
+<!-- ====== Diálogo: cuenta ====== -->
+<dialog id="dlg-account" class="dlg">
+  <div class="dlg-body">
+    <h2 data-i18n="account">Cuenta</h2>
+    <div id="acct-unconfigured" hidden>
+      <p class="muted" data-i18n="acct_unconfigured">La cuenta en la nube no está configurada en esta copia. El avance se guarda solo en este navegador.</p>
+      <div class="dlg-actions"><button type="button" class="btn primary" id="acct-close-unconf" data-i18n="close">Cerrar</button></div>
+    </div>
+    <div id="acct-login" hidden>
+      <p class="muted" data-i18n="acct_intro">Sin contraseña. Escribe tu correo y te enviamos un código de seis dígitos. Con él guardas tu avance y tu historial en cualquier dispositivo.</p>
+      <div class="field">
+        <label class="field-label" for="acct-email" data-i18n="email">Correo</label>
+        <input type="email" id="acct-email" class="input" autocomplete="email" placeholder="tu@correo.com">
+      </div>
+      <div class="field" id="acct-code-field" hidden>
+        <label class="field-label" for="acct-code" data-i18n="code">Código</label>
+        <input type="text" id="acct-code" class="input mono" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+      </div>
+      <div class="screen mono small" id="acct-msg"></div>
+      <div class="dlg-actions">
+        <button type="button" class="btn ghost" id="acct-cancel" data-i18n="close">Cerrar</button>
+        <button type="button" class="btn primary" id="acct-send" data-i18n="send_code">Enviar código</button>
+        <button type="button" class="btn primary" id="acct-verify" hidden data-i18n="enter">Entrar</button>
+      </div>
+    </div>
+    <div id="acct-user" hidden>
+      <div class="meter" id="acct-stats"></div>
+      <p class="muted" id="acct-email-label"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn ghost" id="acct-logout" data-i18n="logout">Cerrar sesión</button>
+        <button type="button" class="btn primary" id="acct-close" data-i18n="close">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</dialog>
 
 <!-- ====== Diálogo: ajustes globales ====== -->
 <dialog id="dlg-settings" class="dlg">
@@ -316,6 +401,8 @@
 <script src="js/ai.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/lessons.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

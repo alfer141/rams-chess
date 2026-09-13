@@ -12,8 +12,11 @@
   /* ---------- Estado ---------- */
   const playGame = new Chess();
   const learnGame = new Chess();
+  const reviewGame = new Chess();
   let game = playGame;              // partida activa según la vista
-  let view = 'play';                // 'play' | 'learn'
+  let view = 'play';                // 'play' | 'learn' | 'history'
+  let games = (() => { try { const g = JSON.parse(localStorage.getItem('rams-chess-games')); return Array.isArray(g) ? g : []; } catch (e) { return []; } })();
+  function saveGames() { try { localStorage.setItem('rams-chess-games', JSON.stringify(games.slice(0, 100))); } catch (e) { /* sin almacenamiento */ } }
 
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5,
@@ -53,6 +56,7 @@
       localStorage.setItem('rams-chess-settings', JSON.stringify(settings));
       localStorage.setItem('rams-chess-progress', JSON.stringify(progress));
     } catch (e) { /* sin almacenamiento */ }
+    if (window.Account && Account.user) Account.saveProgressDebounced(progress);
   }
 
   /* ---------- Sonido (WebAudio, sin archivos) ---------- */
@@ -150,6 +154,7 @@
   const machineColor = () => (state.humanColor === 'w' ? 'b' : 'w');
   const machineToMove = () => view === 'play' && isAIMode() && playGame.turn === machineColor() && !state.over && !state.paused;
   function canInteract() {
+    if (view === 'history') return false;
     if (view === 'learn') return !!learn.lesson && !learn.done && !learn.busy && game.turn === learn.color;
     return !state.over && !state.paused && !state.thinking && (!isAIMode() || game.turn === state.humanColor);
   }
@@ -283,7 +288,9 @@
 
   function renderAll() {
     renderBoard();
-    if (view === 'play') renderPlayPanel(); else renderLearn();
+    if (view === 'play') renderPlayPanel();
+    else if (view === 'learn') renderLearn();
+    else renderReview();
   }
 
   function resultText(over) {
@@ -316,7 +323,7 @@
     state.selected = -1; state.targets = [];
     if (view === 'learn') { learnMove(done); return true; }
 
-    state.log.push({ san: done.san, color: done.color });
+    state.log.push({ san: done.san, color: done.color, from: done.from, to: done.to, promotion: done.promotion || null });
     if (settings.time > 0 && !state.clockOn) { state.clockOn = true; state.lastTick = Date.now(); }
     const st = game.status();
     if (st.over) { endGame(st.result, st.reason); }
@@ -332,6 +339,7 @@
     state.over = { result, reason };
     state.clockOn = false;
     cancelAI();
+    recordGame(result, reason);
     state.selected = -1; state.targets = [];
     sfx.end();
     renderAll();
@@ -339,6 +347,7 @@
   }
 
   function undo() {
+    if (view === 'history') return;
     if (view === 'learn') { if (learn.lesson) loadStage(learn.stage); return; }
     if (!playGame.history.length) return;
     cancelAI();
@@ -567,8 +576,15 @@
     document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     $('panel-play').hidden = v !== 'play';
     $('panel-learn').hidden = v !== 'learn';
+    $('panel-history').hidden = v !== 'history';
     state.selected = -1; state.targets = [];
-    if (v === 'play') {
+    if (v === 'history') {
+      cancelAI();
+      game = reviewGame;
+      renderHistoryList();
+      if (review.g) { state.flipped = review.g.mode === 'ai' && review.g.color === 'b'; buildBoard(); reviewGoto(review.ply); }
+      else { reviewGame.reset(); state.flipped = false; state.lastMove = null; buildBoard(); renderAll(); }
+    } else if (v === 'play') {
       game = playGame;
       state.flipped = isAIMode() && state.humanColor === 'b';
       state.lastMove = playGame.history.length ? playGame.history[playGame.history.length - 1].move : null;
@@ -734,15 +750,20 @@
     }
   }
 
+  function meterHTML(xp, extraSub) {
+    const r = rankFor(xp);
+    const frac = r.to ? (xp - r.from) / (r.to - r.from) : 1;
+    const cells = Array.from({ length: 12 }, (_, i) => `<i class="${i < Math.round(frac * 12) ? 'on' : ''}"></i>`).join('');
+    return `<span class="m-label">${t('xp')}</span>`
+      + `<span class="m-total">${xp}<small>${t('xp_label')}</small></span>`
+      + `<span class="m-value"><span class="lesson-icon"><svg><use href="#pc-${r.piece}"/></svg></span>${t('level')} ${r.index + 1} · ${t('rank_' + r.piece).toUpperCase()}</span>`
+      + `<span class="led-bar">${cells}</span>`
+      + `<span class="m-sub">${r.to ? t('to_next', { n: r.to - xp }) : t('max_level')}${extraSub ? ' · ' + extraSub : ''}</span>`;
+  }
   function renderXP() {
     const xp = xpTotal(), r = rankFor(xp);
-    const pct = r.to ? Math.round(((xp - r.from) / (r.to - r.from)) * 100) : 100;
-    $('xp-card').innerHTML = `<span class="lesson-icon"><svg><use href="#pc-${r.piece}"/></svg></span>`
-      + `<span><div class="xp-rank">${t('level')} ${r.index + 1} · ${t('rank_' + r.piece)}</div>`
-      + `<div class="xp-sub">${r.to ? t('to_next', { n: r.to - xp }) : t('max_level')}</div></span>`
-      + `<span class="xp-total">${xp}<small>${t('xp')}</small></span>`
-      + `<span class="xp-bar"><i style="width:${pct}%"></i></span>`;
-    $('xp-chip').textContent = `${xp} XP · ${t('rank_' + r.piece)}`;
+    $('xp-card').innerHTML = meterHTML(xp);
+    $('xp-chip').textContent = `${String(xp).padStart(4, '0')} XP · ${t('rank_' + r.piece).toUpperCase()}`;
   }
 
   function renderLearn() {
@@ -755,10 +776,10 @@
     $('stage-dots').innerHTML = les.stages.map((_, i) => `<span class="sd ${i < doneN ? 'done' : ''} ${i === learn.stage ? 'cur' : ''}" title="${t('stage')} ${i + 1}"></span>`).join('');
     $('lesson-text').textContent = L(st.text);
     const fb = $('lesson-feedback');
-    fb.innerHTML = (learn.feedbackTitle ? `<span class="fb-title">${learn.feedbackTitle}</span>` : '')
-      + learn.feedback
-      + (learn.feedbackXP ? `<br><span class="fb-xp">${learn.feedbackXP}</span>` : '');
-    fb.className = 'lesson-feedback ' + learn.feedbackKind;
+    fb.innerHTML = (learn.feedbackTitle ? `<span class="fb-title"><span class="led ${learn.feedbackKind}"></span>${learn.feedbackTitle}</span><br>` : '')
+      + (learn.feedbackKind ? learn.feedback : (learn.feedback ? `<span class="dim">${learn.feedback}</span>` : ''))
+      + (learn.feedbackXP ? `<span class="fb-xp">${learn.feedbackXP}</span>` : '');
+    fb.className = 'fb ' + learn.feedbackKind;
     renderXP();
     const last = learn.stage === les.stages.length - 1;
     $('btn-next').disabled = !learn.done;
@@ -778,6 +799,175 @@
     else { closeLesson(); showMessage(t('lesson_done'), t('all_done'), t('nav_play'), () => setView('play')); }
   });
 
+  /* ---------- Partidas: registro, lista y reproducción ---------- */
+  const review = { g: null, ply: 0 };
+
+  function recordGame(result, reason) {
+    if (!state.log.length) return;
+    const g = {
+      id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+      date: new Date().toISOString(),
+      mode: settings.mode, level: isAIMode() ? settings.level : null, color: isAIMode() ? state.humanColor : null,
+      result, reason, moves: state.log.slice(),
+    };
+    games.unshift(g); games = games.slice(0, 100); saveGames();
+    if (window.Account && Account.user) Account.addGame(g).catch(() => { /* se reintenta al sincronizar */ });
+  }
+
+  const gameTitle = (g) => (g.mode === 'ai' ? `${t('vs_machine')} · ${t('lvl_short')} ${g.level}` : t('vs_human'));
+  const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(I18N.lang === 'es' ? 'es-ES' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+  const resultClass = (g) => (g.result === '1-0' ? 'w' : g.result === '0-1' ? 'b' : 'd');
+
+  function renderHistoryList() {
+    $('history-intro').textContent = window.Account && Account.user ? t('history_cloud') : t('history_local');
+    const box = $('game-list');
+    box.dataset.empty = t('no_games');
+    box.innerHTML = '';
+    for (const g of games) {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'game-item'; btn.dataset.id = g.id;
+      const fullMoves = Math.ceil(g.moves.length / 2);
+      btn.innerHTML = `<span class="res ${resultClass(g)}"></span>`
+        + `<span><div class="g-title">${gameTitle(g)}</div><div class="g-sub">${fmtDate(g.date)} · ${fullMoves} ${t('in_moves', { n: '' }).replace(/^en |^in /, '').trim()}</div></span>`
+        + `<span class="g-right">${g.result}<br>${t('r_' + g.reason).replace(/\.$/, '')}</span>`;
+      box.appendChild(btn);
+    }
+  }
+  $('game-list').addEventListener('click', (e) => {
+    const b = e.target.closest('.game-item');
+    if (!b) return;
+    const g = games.find((x) => x.id === b.dataset.id);
+    if (g) openGame(g);
+  });
+
+  function openGame(g) {
+    review.g = g; review.ply = 0;
+    reviewGame.reset();
+    game = reviewGame;
+    $('history-list').hidden = true;
+    $('history-review').hidden = false;
+    state.flipped = g.mode === 'ai' && g.color === 'b';
+    buildBoard();
+    reviewGoto(g.moves.length);   // se abre en la posición final
+  }
+  function closeReview() {
+    review.g = null; review.ply = 0;
+    $('history-list').hidden = false;
+    $('history-review').hidden = true;
+    reviewGame.reset(); state.flipped = false; state.lastMove = null;
+    buildBoard(); renderAll();
+  }
+  function reviewGoto(ply) {
+    const g = review.g; if (!g) return;
+    ply = Math.max(0, Math.min(g.moves.length, ply));
+    while (reviewGame.history.length > ply) reviewGame.undo();
+    while (reviewGame.history.length < ply) {
+      const m = g.moves[reviewGame.history.length];
+      if (!reviewGame.move({ from: m.from, to: m.to, promotion: m.promotion || null })) break;
+    }
+    review.ply = reviewGame.history.length;
+    state.lastMove = review.ply ? reviewGame.history[review.ply - 1].move : null;
+    state.selected = -1; state.targets = [];
+    renderAll();
+  }
+  function renderReview() {
+    const g = review.g; if (!g) return;
+    const n = g.moves.length, p = review.ply;
+    const cur = p ? g.moves[p - 1] : null;
+    const num = cur ? (Math.floor((p - 1) / 2) + 1) + (cur.color === 'w' ? '.' : '…') : '';
+    let html = `<span class="dim">${gameTitle(g)} · ${fmtDate(g.date)}</span><br>`;
+    html += cur ? `${num} ${cur.san}` : t('rev_begin');
+    html += ` <span class="dim">${String(p).padStart(2, '0')}/${String(n).padStart(2, '0')}</span>`;
+    if (p === n) html += `<br><span class="fb-title"><span class="led"></span>${t('rev_end')}</span><br>${resultText({ result: g.result, reason: g.reason })}`;
+    $('review-screen').innerHTML = html;
+    $('btn-rev-start').disabled = p === 0;
+    $('btn-rev-prev').disabled = p === 0;
+    $('btn-rev-next').disabled = p === n;
+  }
+  $('history-back').addEventListener('click', closeReview);
+  $('btn-rev-start').addEventListener('click', () => reviewGoto(0));
+  $('btn-rev-prev').addEventListener('click', () => reviewGoto(review.ply - 1));
+  $('btn-rev-next').addEventListener('click', () => reviewGoto(review.ply + 1));
+
+  /* ---------- Cuenta sin contraseña ---------- */
+  let acctEmail = '';
+  function acctMsg(text, kind) { const el = $('acct-msg'); el.textContent = text || ''; el.className = 'screen mono small' + (kind === 'err' ? ' alert' : ''); }
+  function acctRender() {
+    const conf = window.Account && Account.configured();
+    const user = conf ? Account.user : null;
+    $('acct-unconfigured').hidden = conf;
+    $('acct-login').hidden = !conf || !!user;
+    $('acct-user').hidden = !conf || !user;
+    $('acct-led').hidden = !user;
+    if (user) {
+      $('acct-email-label').textContent = `${t('signed_as')} ${user.email}`;
+      $('acct-stats').innerHTML = meterHTML(xpTotal(), `${games.length} ${t('games_label').toLowerCase()}`);
+    }
+  }
+  function acctReset() {
+    $('acct-code-field').hidden = true; $('acct-verify').hidden = true; $('acct-send').hidden = false;
+    $('acct-code').value = ''; acctMsg('');
+  }
+  $('btn-account').addEventListener('click', () => { acctRender(); acctReset(); $('dlg-account').showModal(); });
+  $('acct-cancel').addEventListener('click', () => $('dlg-account').close());
+  $('acct-close').addEventListener('click', () => $('dlg-account').close());
+  $('acct-close-unconf').addEventListener('click', () => $('dlg-account').close());
+  $('acct-send').addEventListener('click', async () => {
+    const email = $('acct-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { acctMsg(t('bad_email'), 'err'); return; }
+    acctEmail = email; acctMsg(t('sending'));
+    $('acct-send').disabled = true;
+    try {
+      await Account.sendCode(email);
+      acctMsg(t('code_sent'));
+      $('acct-code-field').hidden = false; $('acct-verify').hidden = false; $('acct-send').hidden = true;
+      $('acct-code').focus();
+    } catch (err) { acctMsg((err && err.message) || t('acct_error'), 'err'); }
+    $('acct-send').disabled = false;
+  });
+  $('acct-verify').addEventListener('click', async () => {
+    const code = $('acct-code').value.replace(/\D/g, '');
+    if (code.length !== 6) { acctMsg(t('bad_code'), 'err'); return; }
+    acctMsg(t('verifying'));
+    $('acct-verify').disabled = true;
+    try {
+      await Account.verify(acctEmail, code);
+      $('dlg-account').close();
+    } catch (err) { acctMsg((err && err.message) || t('acct_error'), 'err'); }
+    $('acct-verify').disabled = false;
+  });
+  $('acct-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('acct-verify').click(); });
+  $('acct-email').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('acct-send').hidden) $('acct-send').click(); });
+  $('acct-logout').addEventListener('click', async () => { await Account.signOut(); $('dlg-account').close(); });
+
+  async function syncFromCloud() {
+    try {
+      const profile = await Account.getProfile();
+      if (profile && profile.progress) {
+        const cloud = profile.progress;
+        for (const k of Object.keys(cloud)) progress[k] = Math.max(progress[k] || 0, cloud[k] || 0);
+        progress._xp = Math.max(xpTotal(), profile.xp || 0, cloud._xp || 0);
+      }
+      save();                                   // guarda local y sube la fusión
+      renderLessonList(); if (view === 'learn') renderAll();
+      const cloudGames = await Account.listGames();
+      const ids = new Set(cloudGames.map((g) => g.id));
+      const localOnly = games.filter((g) => !ids.has(g.id));
+      for (const g of localOnly) Account.addGame(g).catch(() => { /* siguiente sincronización */ });
+      games = [...cloudGames, ...localOnly].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 100);
+      saveGames();
+      if (view === 'history') renderHistoryList();
+      acctRender();
+    } catch (e) { /* sin conexión: seguimos con lo local */ }
+  }
+  function onAuthChange(user) {
+    acctRender();
+    if (user) syncFromCloud();
+    else if (view === 'history') renderHistoryList();
+  }
+  acctRender();
+  if (window.Account) Account.init(onAuthChange).catch(() => acctRender());
+
   /* ---------- Teclado ---------- */
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('dialog')) return;
@@ -793,8 +983,9 @@
 
   // API mínima para depurar desde la consola
   window.RamsChess = {
-    get game() { return game; }, state, settings, learn,
-    render: renderAll, setView, openLesson,
+    get game() { return game; }, state, settings, learn, review,
+    get games() { return games; },
+    render: renderAll, setView, openLesson, openGame,
     load(fen) { cancelAI(); game.load(fen); state.log = []; state.lastMove = null; state.over = null; select(-1); renderAll(); },
   };
 })();

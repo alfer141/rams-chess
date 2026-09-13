@@ -25,6 +25,8 @@ python3 -m http.server 8765
 | **Navegación global** | Barra superior con dos secciones, *Jugar* y *Aprender*, y un botón de ajustes (ayudas, tema, sonido, color de acento, idioma, borrar progreso). |
 | **Color de acento** | Cinco pastillas al estilo Braun: amarillo, naranja, rojo, oliva y azul. Cambia botones, interruptores, estrellas y marcas. |
 | **Aprender** | 15 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado) y avanzado (valor de las piezas, mates típicos). El progreso se guarda. |
+| **Partidas** | Historial con reproducción jugada a jugada (Inicio / Anterior / Siguiente). Se guarda en el navegador y, con cuenta, en la nube. |
+| **Cuenta sin contraseña** | Correo + código de seis dígitos (Supabase Auth). Sincroniza avance, experiencia e historial entre dispositivos. Opcional: sin configurar, todo se guarda en local. |
 | **Experiencia** | Cada etapa superada por primera vez da 10 XP (+5 si se resuelve en el mínimo de jugadas). Los XP suben de rango: Peón, Caballo, Alfil, Torre, Dama y Rey. |
 | **Máquina vs Usuario** | Cinco niveles: Principiante, Fácil, Medio, Difícil y Experto. Puedes elegir blancas, negras o al azar. |
 | **Usuario vs Usuario** | Dos personas en el mismo dispositivo. |
@@ -47,7 +49,10 @@ js/engine.js    Reglas del ajedrez (generación de movimientos legales, SAN, FEN
 js/ai.js        Motor de la máquina (negamax + alfa-beta + tablas de posición + quiescence)
 js/i18n.js      Textos en español e inglés
 js/lessons.js   Lecciones de la sección Aprender (posiciones FEN, tipo de reto, textos)
-js/app.js       Interfaz: vistas Jugar/Aprender, relojes, arrastrar y soltar, diálogos
+js/app.js       Interfaz: vistas Jugar/Aprender/Partidas, relojes, arrastrar y soltar, diálogos, cuenta
+js/auth.js      Cuenta sin contraseña y sincronización (Supabase)
+js/config.js    URL y clave pública (anon) del proyecto Supabase — vacías por defecto
+supabase/       schema.sql: tablas, índices y políticas RLS
 audio/          Sonido de interacción de la interfaz (Mixkit, licencia libre)
 test/perft.js   Pruebas del motor (perft contra posiciones estándar)
 test/lessons.js Comprueba que todas las etapas de las lecciones tienen solución
@@ -62,6 +67,22 @@ node test/perft.js && node test/lessons.js
 La primera compara el número de nodos generados con los valores conocidos de posiciones de referencia
 (posición inicial, *Kiwipete*, etc.) y comprueba que la máquina encuentra un mate en uno.
 La segunda resuelve cada etapa de cada lección para asegurar que el reto es alcanzable.
+
+## Cuenta en la nube (Supabase)
+
+El juego funciona sin cuenta. Para activar el inicio de sesión sin contraseña y guardar el avance y el historial:
+
+1. Crea un proyecto gratuito en [supabase.com](https://supabase.com) y ejecuta `supabase/schema.sql` en **SQL Editor**.
+2. En **Authentication → Providers → Email** deja activado el proveedor de correo.
+3. En **Authentication → Email Templates → Magic Link** añade el código a la plantilla, por ejemplo
+   `<p>Tu código: <b>{{ .Token }}</b></p>` (el enlace `{{ .ConfirmationURL }}` también sirve).
+4. En **Authentication → URL Configuration** pon la URL pública del juego como *Site URL*.
+5. Opcional pero recomendado: **Project Settings → Auth → SMTP Settings** con tu proveedor de correo
+   (por ejemplo Resend: host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = tu API key,
+   remitente en un dominio verificado). Sin SMTP propio, Supabase limita a unos pocos correos por hora.
+6. Copia la **Project URL** y la clave **anon public** (*Project Settings → API*) en `js/config.js`.
+
+La clave *anon* es pública por diseño; las políticas RLS del esquema garantizan que cada persona solo lee y escribe sus filas.
 
 ## Desplegar en Vercel
 
