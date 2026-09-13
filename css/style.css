@@ -451,25 +451,79 @@ button { font: inherit; cursor: pointer; }
 .foot a { color: inherit; }
 
 /* ---------- Responsive ---------- */
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+.device { min-width: 0; }
+
 @media (max-width: 900px) {
-  body { padding: 12px 8px; }
-  .device { grid-template-columns: 1fr; grid-template-rows: auto auto auto; padding: 16px 18px 22px; border-radius: 22px; }
-  .topbar { padding-bottom: 12px; margin-bottom: 14px; }
-  .nav button { padding: 7px 14px; font-size: 10px; }
-  .brand { display: none; }
-  .board-area { border-right: 0; padding-right: 0; }
-  .panel { padding-left: 0; margin-top: 18px; }
-  .moves { max-height: 140px; }
-  .ctl-icon { width: 54px; height: 54px; }
-  .ctl-label { font-size: 9.5px; letter-spacing: 0.1em; }
-  .clock { font-size: 34px; }
-  .captured { min-width: 100px; }
-}
-@media (max-width: 420px) {
+  body { padding: 10px 8px; }
+  .device {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    padding: 14px 14px 20px;
+    border-radius: 22px;
+  }
+  /* Barra: marca y botones arriba, pestañas a ancho completo debajo */
+  .topbar { flex-wrap: wrap; gap: 10px; padding-bottom: 12px; margin-bottom: 12px; }
+  .topbar-right { order: 1; width: 100%; gap: 10px; }
+  .brand { display: inline; margin-right: auto; font-size: 10px; }
+  .gear { width: 36px; height: 36px; }
+  .gear svg { width: 18px; height: 18px; }
+  .nav { order: 2; flex: 1 1 100%; display: flex; }
+  .nav button { flex: 1; padding: 8px 4px; font-size: 10px; letter-spacing: 0.12em; }
+
+  .board-area { grid-template-columns: 18px minmax(0, 1fr); grid-template-rows: auto 18px; gap: 4px; border-right: 0; padding-right: 0; }
+  .ranks, .files { font-size: 10.5px; }
+  .board-frame { padding: 5px; border-radius: 8px; }
+
+  .panel { padding-left: 0; margin-top: 14px; }
+  .rule { margin: 10px 0; }
+  .player { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  .player .name { font-size: 15px; }
+  .clock { font-size: 34px; margin-top: 4px; }
+  .captured { min-width: 96px; min-height: 0; padding-left: 12px; }
+  .captured-list { max-width: 104px; }
+  .captured-list .cap { width: 20px; height: 20px; }
+  .moves-wrap { min-height: 0; }
+  .moves { max-height: 110px; font-size: 14px; }
+  .screen { min-height: 60px; padding: 12px 14px; font-size: 12px; }
+
   .controls { gap: 6px; }
-  .ctl-icon { width: 48px; height: 48px; }
-  .player { grid-template-columns: 1fr; }
-  .captured { border-left: 0; padding-left: 0; min-height: 0; }
+  .ctl-icon { width: 52px; height: 52px; }
+  .ctl-icon svg { width: 22px; height: 22px; }
+  .ctl-label { font-size: 9px; letter-spacing: 0.08em; }
+
+  .lesson-groups, .game-list { max-height: none; }
+  .lesson-item { padding: 8px 4px; }
+  .foot { flex-wrap: wrap; justify-content: center; text-align: center; margin-top: 14px; }
+  .input { font-size: 16px; }   /* evita el zoom automático de iOS */
+}
+
+@media (max-width: 420px) {
+  body { padding: 6px 6px 12px; }
+  .device { padding: 12px 10px 16px; border-radius: 18px; }
+  .board-area { grid-template-columns: 14px minmax(0, 1fr); gap: 3px; }
+  .ranks, .files { font-size: 9.5px; }
+  .player .dot { width: 18px; height: 18px; }
+  .player .tag { font-size: 10px; }
+  .clock { font-size: 30px; }
+  .captured { min-width: 88px; padding-left: 10px; }
+  .captured-title { font-size: 10px; }
+  .controls { gap: 4px; }
+  .ctl-icon { width: 46px; height: 46px; }
+  .ctl-icon svg { width: 20px; height: 20px; }
+  .ctl-label { font-size: 8.5px; letter-spacing: 0.06em; }
+  .dlg { width: calc(100vw - 20px); border-radius: 16px; }
+  .dlg-body { padding: 20px 16px 18px; }
+  .seg button { padding: 7px 10px; font-size: 12px; }
+  .swatches { gap: 10px; }
+  .swatch { width: 32px; height: 32px; }
+  .dlg .switch-row { font-size: 13px; }
+  .meter { padding: 10px 8px; }
+  .meter .m-total { font-size: 22px; }
+  .xp-chip { font-size: 10px; padding: 4px 8px; }
+  .lesson-title { grid-template-columns: 38px 1fr; }
+  .lesson-title .xp-chip { grid-column: 1 / -1; justify-self: start; }
 }
 
 /* ---------- Aprender ---------- */
