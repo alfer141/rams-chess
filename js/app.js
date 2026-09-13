@@ -19,7 +19,15 @@
     mode: 'ai', level: 2, color: 'w', time: 5,
     hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow',
   }, load('rams-chess-settings'));
-  let progress = load('rams-chess-progress');   // { lessonId: etapas completadas }
+  let progress = load('rams-chess-progress');   // { lessonId: etapas completadas, _xp: experiencia }
+  const XP_STAGE = 10, XP_BONUS = 5;
+  const RANKS = [['p', 0], ['n', 60], ['b', 140], ['r', 240], ['q', 360], ['k', 500]];
+  const xpTotal = () => progress._xp || 0;
+  function rankFor(xp) {
+    let i = 0;
+    while (i + 1 < RANKS.length && xp >= RANKS[i + 1][1]) i++;
+    return { piece: RANKS[i][0], from: RANKS[i][1], to: i + 1 < RANKS.length ? RANKS[i + 1][1] : null, index: i };
+  }
 
   const state = {
     humanColor: 'w',
@@ -37,7 +45,7 @@
     log: [],
   };
 
-  const learn = { lesson: null, stage: 0, color: 'w', stars: new Set(), moves: 0, done: false, busy: false, feedback: '', feedbackKind: '' };
+  const learn = { lesson: null, stage: 0, color: 'w', stars: new Set(), moves: 0, done: false, busy: false, feedback: '', feedbackKind: '', feedbackTitle: '', feedbackXP: '' };
 
   function load(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } }
   function save() {
@@ -589,6 +597,7 @@
   const lessonDone = (l) => (progress[l.id] || 0) >= l.stages.length;
 
   function renderLessonList() {
+    renderXP();
     const box = $('lesson-groups');
     box.innerHTML = '';
     for (const g of LESSONS.groups) {
@@ -635,20 +644,22 @@
   }
   $('learn-back').addEventListener('click', closeLesson);
 
-  function loadStage(i) {
+  function loadStage(i, keepFeedback) {
     learn.stage = i;
     const st = stage();
     game = learnGame;
     learnGame.load(st.fen);
     learn.color = st.color || 'w';
     learn.stars = new Set((st.stars || []).map(fromAlg));
-    learn.moves = 0; learn.done = false; learn.busy = false; learn.feedback = ''; learn.feedbackKind = '';
+    learn.moves = 0; learn.done = false; learn.busy = false;
+    if (!keepFeedback) { learn.feedback = ''; learn.feedbackKind = ''; learn.feedbackTitle = ''; learn.feedbackXP = ''; }
     state.selected = -1; state.targets = []; state.lastMove = null; state.over = null;
     state.flipped = learn.color === 'b';
     buildBoard(); renderAll();
   }
 
   function learnMove(m) {
+    if (learn.feedbackKind === 'err') { learn.feedback = ''; learn.feedbackKind = ''; learn.feedbackTitle = ''; }
     const st = stage(); const g = learnGame;
     const opp = learn.color === 'w' ? 'b' : 'w';
     learn.moves++;
@@ -687,26 +698,51 @@
       learn.done = true;
       sfx.success();
       const prev = progress[learn.lesson.id] || 0;
+      const firstTime = learn.stage >= prev;
       progress[learn.lesson.id] = Math.max(prev, learn.stage + 1);
+      // Experiencia: solo la primera vez que se supera la etapa; bonus si se hace en el mínimo de jugadas
+      let gained = 0;
+      if (firstTime) {
+        gained = XP_STAGE + (learn.moves <= st.par ? XP_BONUS : 0);
+        progress._xp = xpTotal() + gained;
+      }
       save();
       const cnt = learn.moves === 1 ? t('in_move') : t('in_moves', { n: learn.moves });
-      learn.feedback = `${t('great')} ${cnt}.` + (learn.moves > st.par ? ' ' + t('par_hint', { n: st.par }) : '');
+      learn.feedbackTitle = t('great');
+      learn.feedback = `${cnt.charAt(0).toUpperCase() + cnt.slice(1)}.` + (learn.moves > st.par ? ' ' + t('par_hint', { n: st.par }) : '');
+      learn.feedbackXP = gained ? t('xp_gain', { n: gained }) + (gained > XP_STAGE ? ' · ' + t('xp_bonus') : '') : t('xp_repeat');
       learn.feedbackKind = 'ok';
       renderAll();
     } else if (fail) {
+      // Se muestra la jugada errónea un momento; después la pieza vuelve sola
+      // y el mensaje permanece hasta la siguiente jugada.
       learn.busy = true;
       sfx.fail();
-      learn.feedback = `${t(fail)} ${t('try_again')}`;
+      learn.feedbackTitle = t('try_again');
+      learn.feedback = t(fail);
+      learn.feedbackXP = '';
       learn.feedbackKind = 'err';
       renderAll();
-      setTimeout(() => { if (learn.lesson && learn.busy) loadStage(learn.stage); }, 1400);
+      setTimeout(() => { if (learn.lesson && learn.busy) loadStage(learn.stage, true); }, 1200);
     } else {
       if (m.captured) sfx.capture(); else if (st.type !== 'stars') sfx.move();
+      learn.feedbackTitle = ''; learn.feedbackXP = '';
       if (st.type === 'stars') learn.feedback = t('stars_left', { n: learn.stars.size });
       if (st.type === 'capture') learn.feedback = t('pieces_left', { n: g.board.filter((p) => p && p.color === opp).length });
       learn.feedbackKind = '';
       renderAll();
     }
+  }
+
+  function renderXP() {
+    const xp = xpTotal(), r = rankFor(xp);
+    const pct = r.to ? Math.round(((xp - r.from) / (r.to - r.from)) * 100) : 100;
+    $('xp-card').innerHTML = `<span class="lesson-icon"><svg><use href="#pc-${r.piece}"/></svg></span>`
+      + `<span><div class="xp-rank">${t('level')} ${r.index + 1} · ${t('rank_' + r.piece)}</div>`
+      + `<div class="xp-sub">${r.to ? t('to_next', { n: r.to - xp }) : t('max_level')}</div></span>`
+      + `<span class="xp-total">${xp}<small>${t('xp')}</small></span>`
+      + `<span class="xp-bar"><i style="width:${pct}%"></i></span>`;
+    $('xp-chip').textContent = `${xp} XP · ${t('rank_' + r.piece)}`;
   }
 
   function renderLearn() {
@@ -719,8 +755,11 @@
     $('stage-dots').innerHTML = les.stages.map((_, i) => `<span class="sd ${i < doneN ? 'done' : ''} ${i === learn.stage ? 'cur' : ''}" title="${t('stage')} ${i + 1}"></span>`).join('');
     $('lesson-text').textContent = L(st.text);
     const fb = $('lesson-feedback');
-    fb.textContent = learn.feedback;
+    fb.innerHTML = (learn.feedbackTitle ? `<span class="fb-title">${learn.feedbackTitle}</span>` : '')
+      + learn.feedback
+      + (learn.feedbackXP ? `<br><span class="fb-xp">${learn.feedbackXP}</span>` : '');
     fb.className = 'lesson-feedback ' + learn.feedbackKind;
+    renderXP();
     const last = learn.stage === les.stages.length - 1;
     $('btn-next').disabled = !learn.done;
     $('btn-next').querySelector('.ctl-label').textContent = last ? t('finish') : t('next');

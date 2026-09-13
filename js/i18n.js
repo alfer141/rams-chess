@@ -52,6 +52,9 @@
       not_value: 'Hay una captura más valiosa. Recuerda: dama 9, torre 5, alfil y caballo 3, peón 1.',
       stars_left: 'Estrellas restantes: {n}', pieces_left: 'Piezas por capturar: {n}',
       completed: 'Completado', progress_reset: 'Progreso borrado.',
+      xp: 'Experiencia', level: 'Nivel', xp_gain: '+{n} XP', xp_bonus: 'Bonus por eficiencia', xp_repeat: 'Ya completada: sin XP nuevos.',
+      to_next: '{n} XP para el siguiente rango', max_level: 'Rango máximo alcanzado',
+      rank_p: 'Peón', rank_n: 'Caballo', rank_b: 'Alfil', rank_r: 'Torre', rank_q: 'Dama', rank_k: 'Rey',
       piece_names: { p: 'peón', n: 'caballo', b: 'alfil', r: 'torre', q: 'dama', k: 'rey' },
     },
     en: {
@@ -103,6 +106,9 @@
       not_value: 'There is a more valuable capture. Remember: queen 9, rook 5, bishop and knight 3, pawn 1.',
       stars_left: 'Stars left: {n}', pieces_left: 'Pieces left to capture: {n}',
       completed: 'Completed', progress_reset: 'Progress cleared.',
+      xp: 'Experience', level: 'Level', xp_gain: '+{n} XP', xp_bonus: 'Efficiency bonus', xp_repeat: 'Already completed: no new XP.',
+      to_next: '{n} XP to the next rank', max_level: 'Top rank reached',
+      rank_p: 'Pawn', rank_n: 'Knight', rank_b: 'Bishop', rank_r: 'Rook', rank_q: 'Queen', rank_k: 'King',
       piece_names: { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' },
     },
   };

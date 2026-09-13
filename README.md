@@ -25,6 +25,7 @@ python3 -m http.server 8765
 | **Navegación global** | Barra superior con dos secciones, *Jugar* y *Aprender*, y un botón de ajustes (ayudas, tema, sonido, color de acento, idioma, borrar progreso). |
 | **Color de acento** | Cinco pastillas al estilo Braun: amarillo, naranja, rojo, oliva y azul. Cambia botones, interruptores, estrellas y marcas. |
 | **Aprender** | 15 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado) y avanzado (valor de las piezas, mates típicos). El progreso se guarda. |
+| **Experiencia** | Cada etapa superada por primera vez da 10 XP (+5 si se resuelve en el mínimo de jugadas). Los XP suben de rango: Peón, Caballo, Alfil, Torre, Dama y Rey. |
 | **Máquina vs Usuario** | Cinco niveles: Principiante, Fácil, Medio, Difícil y Experto. Puedes elegir blancas, negras o al azar. |
 | **Usuario vs Usuario** | Dos personas en el mismo dispositivo. |
 | **Mostrar movimientos posibles** | Interruptor que marca las casillas a las que puede ir la pieza seleccionada y explica cómo se mueve. |
