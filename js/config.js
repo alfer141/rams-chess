@@ -7,6 +7,6 @@
    Si se dejan vacíos, el juego funciona igual sin cuenta.
    ============================================================ */
 window.RAMS_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://cyvpvlvqnjyblaribnty.supabase.co',
+  supabaseAnonKey: 'sb_publishable_oly8JTmOmiVZHdatCTxKVg_9LmhaABm',
 };
