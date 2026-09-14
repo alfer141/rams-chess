@@ -195,7 +195,69 @@
     return new Search(game, cfg.time).best(cfg.depth);
   }
 
-  const AI = { chooseMove, evaluate, LEVELS };
+  /* ---------- Revisión de partida (estilo "Game Review") ----------
+     Evalúa cada posición con el motor y clasifica cada jugada por la
+     pérdida en centipeones respecto a la mejor. Devuelve además la
+     precisión por bando (fórmula de porcentaje de victoria, como Lichess). */
+  const MATE = 100000;
+  const cpClamp = (score) => Math.max(-1500, Math.min(1500, Math.abs(score) > 90000 ? Math.sign(score) * 1500 : score));
+  const winPct = (cp) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cpClamp(cp))) - 1);
+  function classify(loss, isBest) {
+    if (isBest || loss <= 0) return 'best';
+    if (loss <= 25) return 'excellent';
+    if (loss <= 60) return 'good';
+    if (loss <= 120) return 'inaccuracy';
+    if (loss <= 300) return 'mistake';
+    return 'blunder';
+  }
+  function searchPosition(game, time, depth) {
+    const moves = game.legalMoves();
+    if (!moves.length) return { move: null, score: game.inCheck() ? -MATE : 0, terminal: game.inCheck() ? 'mate' : 'stalemate' };
+    const r = new Search(game, time).best(depth);
+    return { move: r.move, score: r.score, terminal: null };
+  }
+  function analyzeGame(moves, opts = {}, onProgress) {
+    const time = opts.time || 150, depth = opts.depth || 4;
+    const game = new global.Chess();
+    const plies = [];
+    let cur = searchPosition(game, time, depth);   // análisis de la posición inicial
+    for (let i = 0; i < moves.length; i++) {
+      const m = moves[i];
+      const mover = game.turn;
+      const legal = game.legalMoves().find((l) => l.from === m.from && l.to === m.to && (l.promotion || null) === (m.promotion || null));
+      if (!legal) break;
+      const bestSan = cur.move ? game._san(cur.move) : null;
+      const isBest = !!cur.move && cur.move.from === legal.from && cur.move.to === legal.to && (cur.move.promotion || null) === (legal.promotion || null);
+      game.move(legal);
+      const next = searchPosition(game, time, depth);        // mejor respuesta del rival
+      const playedScore = -next.score;                       // desde el punto de vista de quien movió
+      const bestScore = cur.score;
+      const loss = Math.max(0, cpClamp(bestScore) - cpClamp(playedScore));
+      const cls = next.terminal === 'mate' ? 'best' : classify(loss, isBest);
+      const reply = next.move ? { from: next.move.from, to: next.move.to, san: game._san(next.move), captured: next.move.captured || null } : null;
+      plies.push({
+        color: mover, cls, loss: Math.round(loss),
+        best: cur.move ? { from: cur.move.from, to: cur.move.to, san: bestSan } : null,
+        bestScore, playedScore, isBest,
+        mateBest: bestScore > 90000, mateMissed: bestScore > 90000 && playedScore < 90000,
+        delivered: next.terminal,                             // 'mate' | 'stalemate' | null
+        reply,
+        acc: Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * (winPct(bestScore) - winPct(playedScore))) - 3.1669)),
+      });
+      cur = next;
+      if (onProgress) onProgress(i + 1, moves.length);
+    }
+    const acc = { w: 0, b: 0 };
+    for (const c of ['w', 'b']) {
+      const list = plies.filter((p) => p.color === c);
+      acc[c] = list.length ? Math.round(list.reduce((a, p) => a + p.acc, 0) / list.length) : 0;
+    }
+    const counts = { w: {}, b: {} };
+    for (const p of plies) counts[p.color][p.cls] = (counts[p.color][p.cls] || 0) + 1;
+    return { plies, acc, counts };
+  }
+
+  const AI = { chooseMove, evaluate, LEVELS, analyzeGame };
   global.ChessAI = AI;
 
   /* ---- Modo Web Worker ---- */
@@ -203,6 +265,11 @@
     importScripts('engine.js');
     self.onmessage = (e) => {
       const { fen, level, id } = e.data;
+      if (e.data.analyze) {
+        const review = analyzeGame(e.data.moves, e.data.opts || {}, (done, total) => self.postMessage({ id, progress: done, total }));
+        self.postMessage({ id, review });
+        return;
+      }
       const game = new self.Chess().load(fen);
       const r = chooseMove(game, level);
       self.postMessage({ id, move: r ? { from: r.move.from, to: r.move.to, promotion: r.move.promotion || null } : null, nodes: r ? r.nodes : 0 });

@@ -229,6 +229,13 @@
         </button>
       </div>
       <div class="module-label" data-i18n="playback">Reproducción</div>
+      <div class="controls controls-1">
+        <button class="ctl accent" id="btn-review" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3 2"/></svg></span>
+          <span class="ctl-label" data-i18n="review">Revisar</span>
+        </button>
+      </div>
+      <div class="module-label" data-i18n="coach">Entrenador</div>
     </div>
   </aside>
 </main>
@@ -292,6 +299,11 @@
       <label class="switch-row">
         <span data-i18n="sound">Sonido</span>
         <input type="checkbox" id="sw-sound" class="switch" checked>
+        <span class="track"><span class="knob"></span></span>
+      </label>
+      <label class="switch-row">
+        <span data-i18n="voice">Voz del entrenador</span>
+        <input type="checkbox" id="sw-voice" class="switch" checked>
         <span class="track"><span class="knob"></span></span>
       </label>
       <div class="switch-row lang-row">
@@ -385,6 +397,7 @@
     <p id="msg-body" class="muted"></p>
     <div class="dlg-actions">
       <button type="button" class="btn ghost" id="msg-cancel" data-i18n="close">Cerrar</button>
+      <button type="button" class="btn ghost" id="msg-alt" hidden></button>
       <button type="button" class="btn primary" id="msg-ok"></button>
     </div>
   </div>

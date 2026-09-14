@@ -20,7 +20,7 @@
 
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5,
-    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow',
+    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true,
   }, load('rams-chess-settings'));
   let progress = load('rams-chess-progress');   // { lessonId: etapas completadas, _xp: experiencia }
   const XP_STAGE = 10, XP_BONUS = 5;
@@ -343,7 +343,9 @@
     state.selected = -1; state.targets = [];
     sfx.end();
     renderAll();
-    showMessage(t('over_title'), resultText(state.over), t('play_again'), () => $('dlg-new').showModal());
+    const last = games[0];
+    showMessage(t('over_title'), resultText(state.over), t('play_again'), () => $('dlg-new').showModal(), null,
+      last ? { label: t('review_game'), onClick: () => { setView('history'); openGame(last); startReview(); } } : null);
   }
 
   function undo() {
@@ -438,7 +440,7 @@
   }
 
   /* ---------- Mensajes ---------- */
-  function showMessage(title, body, okLabel, onOk, cancelLabel) {
+  function showMessage(title, body, okLabel, onOk, cancelLabel, alt) {
     const dlg = $('dlg-msg');
     $('msg-title').textContent = title;
     $('msg-body').textContent = body;
@@ -446,6 +448,9 @@
     $('msg-cancel').textContent = cancelLabel || t('close');
     $('msg-ok').onclick = () => { dlg.close(); onOk && onOk(); };
     $('msg-cancel').onclick = () => dlg.close();
+    const altBtn = $('msg-alt');
+    altBtn.hidden = !alt;
+    if (alt) { altBtn.textContent = alt.label; altBtn.onclick = () => { dlg.close(); alt.onClick(); }; }
     dlg.showModal();
   }
 
@@ -566,12 +571,15 @@
 
   $('sw-sound').checked = settings.sound;
   $('sw-sound').addEventListener('change', (e) => { settings.sound = e.target.checked; save(); });
+  $('sw-voice').checked = settings.voice;
+  $('sw-voice').addEventListener('change', (e) => { settings.voice = e.target.checked; save(); if (!settings.voice) hush(); });
 
   document.querySelectorAll('#lang-seg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === settings.lang));
 
   /* ---------- Navegación global ---------- */
   function setView(v, silent) {
     if (v === view && !silent) return;
+    hush();
     view = v;
     document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     $('panel-play').hidden = v !== 'play';
@@ -828,8 +836,8 @@
       btn.type = 'button'; btn.className = 'game-item'; btn.dataset.id = g.id;
       const fullMoves = Math.ceil(g.moves.length / 2);
       btn.innerHTML = `<span class="res ${resultClass(g)}"></span>`
-        + `<span><div class="g-title">${gameTitle(g)}</div><div class="g-sub">${fmtDate(g.date)} · ${fullMoves} ${t('in_moves', { n: '' }).replace(/^en |^in /, '').trim()}</div></span>`
-        + `<span class="g-right">${g.result}<br>${t('r_' + g.reason).replace(/\.$/, '')}</span>`;
+        + `<span><div class="g-title">${gameTitle(g)}</div><div class="g-sub">${fmtDate(g.date)} · ${fullMoves} ${t('moves_word')}</div></span>`
+        + `<span class="g-right">${g.result}<br>${g.review ? `<span class="g-acc">${g.review.acc.w}% · ${g.review.acc.b}%</span>` : t('r_' + g.reason).replace(/\.$/, '')}</span>`;
       box.appendChild(btn);
     }
   }
@@ -848,9 +856,11 @@
     $('history-review').hidden = false;
     state.flipped = g.mode === 'ai' && g.color === 'b';
     buildBoard();
-    reviewGoto(g.moves.length);   // se abre en la posición final
+    reviewGoto(g.review ? 0 : g.moves.length);   // revisada: resumen; si no, posición final
+    hush();
   }
   function closeReview() {
+    hush(); reviewRun.id++; reviewRun.busy = false;
     review.g = null; review.ply = 0;
     $('history-list').hidden = false;
     $('history-review').hidden = true;
@@ -869,6 +879,11 @@
     state.lastMove = review.ply ? reviewGame.history[review.ply - 1].move : null;
     state.selected = -1; state.targets = [];
     renderAll();
+    const rv = g.review;
+    if (rv && review.ply > 0 && rv.plies[review.ply - 1]) {
+      const cur = g.moves[review.ply - 1];
+      say(`${spokenSan(cur.san)}. ${coachSpeech(rv.plies[review.ply - 1])}`);
+    }
   }
   function renderReview() {
     const g = review.g; if (!g) return;
@@ -879,15 +894,119 @@
     html += cur ? `${num} ${cur.san}` : t('rev_begin');
     html += ` <span class="dim">${String(p).padStart(2, '0')}/${String(n).padStart(2, '0')}</span>`;
     if (p === n) html += `<br><span class="fb-title"><span class="led"></span>${t('rev_end')}</span><br>${resultText({ result: g.result, reason: g.reason })}`;
+    const rv = g.review;
+    if (reviewRun.busy) {
+      html += `<div class="fb"><span class="fb-title"><span class="led"></span>${t('coach')}</span><br>${t('reviewing', { i: reviewRun.progress, n: reviewRun.total })}`
+        + `<span class="bar"><i style="width:${reviewRun.total ? Math.round(reviewRun.progress / reviewRun.total * 100) : 0}%"></i></span></div>`;
+    } else if (rv && p === 0) {
+      const c = (col) => t('counts_line', { bl: rv.counts[col].blunder || 0, mi: rv.counts[col].mistake || 0, in: rv.counts[col].inaccuracy || 0 });
+      html += `<div class="fb"><span class="fb-title"><span class="led"></span>${t('accuracy')}</span>`
+        + `<span class="acc-row"><span class="acc"><small>${t('white')}</small><b>${rv.acc.w}%</b><span class="bar"><i style="width:${rv.acc.w}%"></i></span><small>${c('w')}</small></span>`
+        + `<span class="acc"><small>${t('black')}</small><b>${rv.acc.b}%</b><span class="bar"><i style="width:${rv.acc.b}%"></i></span><small>${c('b')}</small></span></span></div>`;
+    } else if (rv && rv.plies[p - 1]) {
+      const ply = rv.plies[p - 1];
+      html += `<div class="fb"><span class="fb-title"><span class="led ${ply.cls}"></span>${t('cls_' + ply.cls)}</span><br>${coachComment(ply).replace(t('cls_' + ply.cls) + '. ', '')}</div>`;
+    } else if (!rv) {
+      html += `<div class="fb"><span class="dim">${t('review_hint')}</span></div>`;
+    }
     $('review-screen').innerHTML = html;
-    $('btn-rev-start').disabled = p === 0;
-    $('btn-rev-prev').disabled = p === 0;
-    $('btn-rev-next').disabled = p === n;
+    $('btn-rev-start').disabled = p === 0 || reviewRun.busy;
+    $('btn-rev-prev').disabled = p === 0 || reviewRun.busy;
+    $('btn-rev-next').disabled = p === n || reviewRun.busy;
+    $('btn-review').disabled = reviewRun.busy || !!rv;
   }
   $('history-back').addEventListener('click', closeReview);
   $('btn-rev-start').addEventListener('click', () => reviewGoto(0));
   $('btn-rev-prev').addEventListener('click', () => reviewGoto(review.ply - 1));
   $('btn-rev-next').addEventListener('click', () => reviewGoto(review.ply + 1));
+
+  /* ---------- Voz del entrenador (Web Speech API, sin servicios externos) ---------- */
+  const speech = { on: 'speechSynthesis' in window, voice: null };
+  function pickVoice() {
+    if (!speech.on) return null;
+    const lang = I18N.lang === 'es' ? 'es' : 'en';
+    const voices = speechSynthesis.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith(lang));
+    const preferred = voices.find((v) => /monica|paulina|jorge|google|premium|enhanced|samantha|daniel/i.test(v.name)) || voices[0];
+    return preferred || null;
+  }
+  if (speech.on) speechSynthesis.onvoiceschanged = () => { speech.voice = pickVoice(); };
+  function say(text) {
+    if (!speech.on || !settings.voice || !text) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/[#+]/g, ''));
+      u.lang = I18N.lang === 'es' ? 'es-ES' : 'en-GB';
+      u.rate = 1; u.pitch = 1;
+      speech.voice = speech.voice || pickVoice();
+      if (speech.voice) u.voice = speech.voice;
+      const btn = $('btn-review');
+      u.onstart = () => btn.classList.add('speaking');
+      u.onend = () => btn.classList.remove('speaking');
+      u.onerror = () => btn.classList.remove('speaking');
+      speechSynthesis.speak(u);
+    } catch (e) { /* sin voz */ }
+  }
+  function hush() { if (speech.on) { try { speechSynthesis.cancel(); } catch (e) { /* ignorar */ } } }
+
+  /* ---------- Revisión de partida (motor + comentarios de plantilla) ---------- */
+  const reviewRun = { id: 0, busy: false, progress: 0, total: 0 };
+  function spokenSan(san) {
+    // "Nf3" -> "caballo f3", "O-O" -> "enroque corto"…
+    const names = I18N.lang === 'es'
+      ? { N: 'caballo', B: 'alfil', R: 'torre', Q: 'dama', K: 'rey' }
+      : { N: 'knight', B: 'bishop', R: 'rook', Q: 'queen', K: 'king' };
+    if (san === 'O-O') return I18N.lang === 'es' ? 'enroque corto' : 'castles short';
+    if (san === 'O-O-O') return I18N.lang === 'es' ? 'enroque largo' : 'castles long';
+    let out = san.replace(/[+#]/g, '');
+    out = out.replace(/^([NBRQK])/, (m, p) => names[p] + ' ');
+    out = out.replace(/x/, I18N.lang === 'es' ? ' por ' : ' takes ');
+    out = out.replace(/=([NBRQ])/, (m, p) => (I18N.lang === 'es' ? ' corona ' : ' promotes to ') + names[p]);
+    return out;
+  }
+  function coachComment(ply, plyIndex) {
+    const parts = [];
+    parts.push(t('cls_' + ply.cls) + '.');
+    if (ply.delivered === 'mate') { parts.push(t('mate_played')); return parts.join(' '); }
+    if (ply.mateMissed && ply.best) parts.push(t('mate_missed', { m: ply.best.san }));
+    else if (ply.cls === 'best') parts.push(t('keeps_best'));
+    else if (ply.cls === 'excellent' || ply.cls === 'good') { if (ply.best) parts.push(t('also_good', { m: ply.best.san })); }
+    else if (ply.best) parts.push(t('better_was', { m: ply.best.san }));
+    if ((ply.cls === 'mistake' || ply.cls === 'blunder') && ply.reply && ply.reply.captured && ply.loss >= 150) parts.push(t('loses_material', { m: ply.reply.san }));
+    return parts.join(' ');
+  }
+  function coachSpeech(ply) {
+    return coachComment(ply).replace(/\b(O-O-O|O-O|[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](=[NBRQ])?[+#]?)\b/g, (m) => spokenSan(m));
+  }
+  function startReview() {
+    const g = review.g; if (!g || reviewRun.busy) return;
+    if (g.review) { renderReview(); return; }
+    const id = ++reviewRun.id;
+    reviewRun.busy = true; reviewRun.progress = 0; reviewRun.total = g.moves.length;
+    renderReview();
+    const moves = g.moves.map((m) => ({ from: m.from, to: m.to, promotion: m.promotion || null }));
+    const finish = (result) => {
+      if (id !== reviewRun.id) return;
+      reviewRun.busy = false;
+      g.review = result; saveGames();
+      sfx.success();
+      reviewGoto(0);
+      renderHistoryList();
+      say(`${t('accuracy')}: ${t('summary_line', { w: result.acc.w, b: result.acc.b })}`);
+    };
+    if (worker) {
+      const handler = (e) => {
+        if (e.data.id !== id) return;
+        if (e.data.progress !== undefined) { reviewRun.progress = e.data.progress; renderReview(); return; }
+        worker.removeEventListener('message', handler);
+        finish(e.data.review);
+      };
+      worker.addEventListener('message', handler);
+      worker.postMessage({ id, analyze: true, moves, opts: { time: 150, depth: 4 } });
+    } else {
+      setTimeout(() => finish(ChessAI.analyzeGame(moves, { time: 120, depth: 3 })), 30);
+    }
+  }
+  $('btn-review').addEventListener('click', startReview);
 
   /* ---------- Cuenta sin contraseña ---------- */
   let acctEmail = '';
