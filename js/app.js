@@ -20,7 +20,7 @@
 
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5,
-    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true,
+    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true, ttsVoice: 'Kore',
   }, load('rams-chess-settings'));
   let progress = load('rams-chess-progress');   // { lessonId: etapas completadas, _xp: experiencia }
   const XP_STAGE = 10, XP_BONUS = 5;
@@ -573,6 +573,12 @@
   $('sw-sound').addEventListener('change', (e) => { settings.sound = e.target.checked; save(); });
   $('sw-voice').checked = settings.voice;
   $('sw-voice').addEventListener('change', (e) => { settings.voice = e.target.checked; save(); if (!settings.voice) hush(); });
+  document.querySelectorAll('#voice-seg button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings.ttsVoice));
+  $('voice-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    settings.ttsVoice = b.dataset.v; save();
+  });
+  $('btn-voice-test').addEventListener('click', () => { const was = settings.voice; settings.voice = true; say(t('tts_sample')); settings.voice = was; });
 
   document.querySelectorAll('#lang-seg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === settings.lang));
 
@@ -930,7 +936,56 @@
     return preferred || null;
   }
   if (speech.on) speechSynthesis.onvoiceschanged = () => { speech.voice = pickVoice(); };
+  /* Voz en la nube (Gemini TTS a través de /api/tts). Si la función no está
+     configurada (501), falla o agota la cuota, se usa la voz del navegador. */
+  const tts = { available: true, cache: new Map(), source: null, seq: 0 };
+  const ttsKey = (text) => `${I18N.lang}|${settings.ttsVoice}|${text}`;
+  async function ttsFetch(text) {
+    const key = ttsKey(text);
+    if (tts.cache.has(key)) return tts.cache.get(key);
+    const url = `api/tts?t=${encodeURIComponent(text)}&v=${encodeURIComponent(settings.ttsVoice)}&l=${I18N.lang}`;
+    let res = null;
+    try { if ('caches' in window) { const c = await caches.open('rams-tts-v1'); res = await c.match(url); } } catch (e) { res = null; }
+    if (!res) {
+      res = await fetch(url);
+      if (res.status === 501 || res.status === 404) { tts.available = false; throw new Error('tts-unavailable'); }
+      if (!res.ok) throw new Error('tts-' + res.status);
+      try { if ('caches' in window) { const c = await caches.open('rams-tts-v1'); await c.put(url, res.clone()); } } catch (e) { /* sin caché */ }
+    }
+    const buf = await res.arrayBuffer();
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await audio.decodeAudioData(buf);
+    tts.cache.set(key, decoded);
+    return decoded;
+  }
+  function ttsStop() {
+    if (tts.source) { try { tts.source.stop(); } catch (e) { /* ya parado */ } tts.source = null; }
+    $('btn-review').classList.remove('speaking');
+  }
+  async function sayCloud(text) {
+    const seq = ++tts.seq;
+    const decoded = await ttsFetch(text);
+    if (seq !== tts.seq) return;           // llegó una frase más nueva mientras se generaba
+    ttsStop();
+    if (audio.state === 'suspended') await audio.resume();
+    const src = audio.createBufferSource();
+    src.buffer = decoded;
+    src.connect(audio.destination);
+    src.onended = () => { if (tts.source === src) { tts.source = null; $('btn-review').classList.remove('speaking'); } };
+    tts.source = src;
+    $('btn-review').classList.add('speaking');
+    src.start();
+  }
   function say(text) {
+    if (!settings.voice || !text) return;
+    ttsStop();
+    if (tts.available) {
+      sayCloud(text).catch(() => { if (settings.voice) sayLocal(text); });
+      return;
+    }
+    sayLocal(text);
+  }
+  function sayLocal(text) {
     if (!speech.on || !settings.voice || !text) return;
     try {
       speechSynthesis.cancel();
@@ -946,7 +1001,7 @@
       speechSynthesis.speak(u);
     } catch (e) { /* sin voz */ }
   }
-  function hush() { if (speech.on) { try { speechSynthesis.cancel(); } catch (e) { /* ignorar */ } } }
+  function hush() { tts.seq++; ttsStop(); if (speech.on) { try { speechSynthesis.cancel(); } catch (e) { /* ignorar */ } } }
 
   /* ---------- Revisión de partida (motor + comentarios de plantilla) ---------- */
   const reviewRun = { id: 0, busy: false, progress: 0, total: 0 };

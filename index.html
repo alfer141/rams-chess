@@ -306,6 +306,19 @@
         <input type="checkbox" id="sw-voice" class="switch" checked>
         <span class="track"><span class="knob"></span></span>
       </label>
+      <div class="switch-row lang-row voice-row" id="voice-row">
+        <span data-i18n="tts_voice">Timbre (Gemini)</span>
+        <div class="voice-pick">
+          <div class="seg small" id="voice-seg">
+            <button type="button" data-v="Kore" class="on">Kore</button>
+            <button type="button" data-v="Aoede">Aoede</button>
+            <button type="button" data-v="Charon">Charon</button>
+            <button type="button" data-v="Sulafat">Sulafat</button>
+            <button type="button" data-v="Puck">Puck</button>
+          </div>
+          <button type="button" class="btn ghost tiny" id="btn-voice-test" data-i18n="tts_test">Probar</button>
+        </div>
+      </div>
       <div class="switch-row lang-row">
         <span data-i18n="accent">Color de acento</span>
         <div class="swatches" id="swatches">

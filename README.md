@@ -27,7 +27,7 @@ python3 -m http.server 8765
 | **Aprender** | 15 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado) y avanzado (valor de las piezas, mates típicos). El progreso se guarda. |
 | **Partidas** | Historial con reproducción jugada a jugada (Inicio / Anterior / Siguiente). Se guarda en el navegador y, con cuenta, en la nube. |
 | **Entrenador (revisión de partida)** | Como el *Game Review* de chess.com pero con el motor local: clasifica cada jugada (mejor, excelente, buena, imprecisión, error, error grave), calcula la precisión por bando y comenta qué era mejor. Sin API ni coste. |
-| **Voz del entrenador** | Lee los comentarios en voz alta con la Web Speech API del navegador (español o inglés). Se apaga en Ajustes. |
+| **Voz del entrenador** | Voz neuronal de Gemini TTS (gratuita en el nivel gratuito de Google AI Studio) a través de `api/tts.js`, con caché en la CDN y en el navegador. Sin clave o sin cuota, cae automáticamente a la voz del navegador (Web Speech API). Timbre elegible en Ajustes. |
 | **Cuenta sin contraseña** | Correo + código de seis dígitos (Supabase Auth). Sincroniza avance, experiencia e historial entre dispositivos. Opcional: sin configurar, todo se guarda en local. |
 | **Experiencia** | Cada etapa superada por primera vez da 10 XP (+5 si se resuelve en el mínimo de jugadas). Los XP suben de rango: Peón, Caballo, Alfil, Torre, Dama y Rey. |
 | **Máquina vs Usuario** | Cinco niveles: Principiante, Fácil, Medio, Difícil y Experto. Puedes elegir blancas, negras o al azar. |
@@ -53,6 +53,7 @@ js/i18n.js      Textos en español e inglés
 js/lessons.js   Lecciones de la sección Aprender (posiciones FEN, tipo de reto, textos)
 js/app.js       Interfaz: vistas Jugar/Aprender/Partidas, relojes, arrastrar y soltar, diálogos, cuenta
 js/auth.js      Cuenta sin contraseña y sincronización (Supabase)
+api/tts.js      Función de Vercel: texto → audio WAV con Gemini TTS (clave en GEMINI_API_KEY)
 js/config.js    URL y clave pública (anon) del proyecto Supabase — vacías por defecto
 supabase/       schema.sql: tablas, índices y políticas RLS
 audio/          Sonido de interacción de la interfaz (Mixkit, licencia libre)
@@ -85,6 +86,16 @@ El juego funciona sin cuenta. Para activar el inicio de sesión sin contraseña 
 6. Copia la **Project URL** y la clave **anon public** (*Project Settings → API*) en `js/config.js`.
 
 La clave *anon* es pública por diseño; las políticas RLS del esquema garantizan que cada persona solo lee y escribe sus filas.
+
+## Voz del entrenador con Gemini (opcional)
+
+1. Crea una clave en [Google AI Studio](https://aistudio.google.com/apikey) (no hace falta tarjeta; el modelo `gemini-2.5-flash-preview-tts` está en el nivel gratuito).
+2. En Vercel → Project → Settings → Environment Variables añade `GEMINI_API_KEY` con esa clave (todos los entornos) y vuelve a desplegar.
+3. Opcional: `GEMINI_TTS_MODEL` para cambiar de modelo (por ejemplo `gemini-3.1-flash-tts-preview`).
+
+Cada frase se genera una sola vez: la respuesta se cachea por texto y timbre en la CDN de Vercel y en el navegador. Si la cuota gratuita se agota, el juego sigue hablando con la voz del navegador.
+
+En local, `vercel dev --listen 8766` sirve la función; con `python3 -m http.server` solo se usa la voz del navegador.
 
 ## Desplegar en Vercel
 
