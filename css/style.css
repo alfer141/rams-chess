@@ -699,3 +699,8 @@ body { overflow-x: hidden; }
 /* ---------- Jugar con entrenador ---------- */
 .sq.coach-from::after, .sq.coach-to::after { content: ""; position: absolute; inset: 6%; border-radius: 6px; border: 3px dashed var(--accent); box-sizing: border-box; pointer-events: none; z-index: 3; }
 .sq.coach-to::after { border-style: solid; }
+
+/* Display estable con el entrenador activo: altura mínima para que no salte al seleccionar piezas */
+.screen.coach { min-height: 148px; }
+.screen .fb.tip { border-top-style: dotted; font-size: 11.5px; }
+@media (max-width: 900px) { .screen.coach { min-height: 132px; } }

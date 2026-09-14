@@ -275,17 +275,19 @@
     line.classList.remove('alert');
     $('coach-row').hidden = !coachOn();
     $('btn-hint').disabled = !coachOn() || !canInteract();
+    line.classList.toggle('coach', coachOn());
     if (state.over) { line.textContent = resultText(state.over); return; }
-    if (state.selected >= 0) { line.textContent = pieceTip(game.get(state.selected), state.targets); return; }
     if (coachOn() && (coach.msg || coach.verdict)) {
+      // Altura estable: el mensaje del entrenador no se sustituye; la ayuda de la pieza se añade debajo
       const ledOf = (k) => (k === 'err' ? 'err' : k === 'ok' ? 'ok' : k === 'warn' ? 'inaccuracy' : '');
       let html = `<span class="fb-title"><span class="led ${ledOf(coach.verdict ? coach.verdictKind : coach.kind)}"></span>${t('coach')}</span><br>`;
       if (coach.verdict) html += coach.verdict;
       if (coach.msg) html += (coach.verdict ? `<div class="fb">` : '') + (coach.kind ? coach.msg : `<span class="dim">${coach.msg}</span>`) + (coach.verdict ? '</div>' : '');
-      if (state.thinking) html += `<br><span class="dim">${t('thinking')}</span>`;
+      if (state.thinking && state.selected < 0) html += `<br><span class="dim">${t('thinking')}</span>`;
       line.innerHTML = html;
       return;
     }
+    if (state.selected >= 0) { line.textContent = pieceTip(game.get(state.selected), state.targets); return; }
     if (state.thinking) { line.textContent = t('thinking'); return; }
     if (game.inCheck()) { line.textContent = t('check'); line.classList.add('alert'); return; }
     line.textContent = state.log.length ? t(game.turn === 'w' ? 'turn_w' : 'turn_b') : t('welcome');
