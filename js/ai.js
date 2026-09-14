@@ -257,7 +257,11 @@
     return { plies, acc, counts };
   }
 
-  const AI = { chooseMove, evaluate, LEVELS, analyzeGame };
+  function coachEval(game, opts = {}) {
+    const r = searchPosition(game, opts.time || 200, opts.depth || 3);
+    return { best: r.move ? { from: r.move.from, to: r.move.to, promotion: r.move.promotion || null, san: game._san(r.move), captured: r.move.captured || null } : null, score: r.score, terminal: r.terminal };
+  }
+  const AI = { chooseMove, evaluate, LEVELS, analyzeGame, coachEval, classify, cpClamp };
   global.ChessAI = AI;
 
   /* ---- Modo Web Worker ---- */
@@ -265,6 +269,12 @@
     importScripts('engine.js');
     self.onmessage = (e) => {
       const { fen, level, id } = e.data;
+      if (e.data.coach) {
+        const game = new self.Chess().load(e.data.fen);
+        const r = searchPosition(game, e.data.time || 200, e.data.depth || 3);
+        self.postMessage({ id, coach: true, best: r.move ? { from: r.move.from, to: r.move.to, promotion: r.move.promotion || null, san: game._san(r.move), captured: r.move.captured || null } : null, score: r.score, terminal: r.terminal });
+        return;
+      }
       if (e.data.analyze) {
         const review = analyzeGame(e.data.moves, e.data.opts || {}, (done, total) => self.postMessage({ id, progress: done, total }));
         self.postMessage({ id, review });

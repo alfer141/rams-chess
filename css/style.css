@@ -695,3 +695,7 @@ body { overflow-x: hidden; }
 .voice-pick { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .btn.tiny { padding: 6px 12px; font-size: 12px; }
 .voice-row .status { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); }
+
+/* ---------- Jugar con entrenador ---------- */
+.sq.coach-from::after, .sq.coach-to::after { content: ""; position: absolute; inset: 6%; border-radius: 6px; border: 3px dashed var(--accent); box-sizing: border-box; pointer-events: none; z-index: 3; }
+.sq.coach-to::after { border-style: solid; }

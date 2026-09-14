@@ -148,6 +148,15 @@
       </button>
     </div>
     <div class="module-label" data-i18n="keypad">Teclado</div>
+    <div id="coach-row" hidden>
+      <div class="controls controls-1">
+        <button class="ctl accent" id="btn-hint" type="button">
+          <span class="ctl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1.1 2.2h5c.1-1 .5-1.7 1.1-2.2A6 6 0 0 0 12 3z"/></svg></span>
+          <span class="ctl-label" data-i18n="hint">Pista</span>
+        </button>
+      </div>
+      <div class="module-label" data-i18n="coach">Entrenador</div>
+    </div>
   </aside>
 
   <!-- ====== Panel: Aprender ====== -->
@@ -365,6 +374,14 @@
         <button type="button" data-v="3" data-i18n="lvl3">Medio</button>
         <button type="button" data-v="4" data-i18n="lvl4">Difícil</button>
         <button type="button" data-v="5" data-i18n="lvl5">Experto</button>
+      </div>
+    </div>
+
+    <div class="field" id="field-coach">
+      <span class="field-label" data-i18n="coach_mode">Entrenador</span>
+      <div class="seg" id="seg-coach">
+        <button type="button" data-v="1" data-i18n="coach_on">Con entrenador</button>
+        <button type="button" data-v="0" class="on" data-i18n="coach_off">Sin entrenador</button>
       </div>
     </div>
 

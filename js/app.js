@@ -19,7 +19,7 @@
   function saveGames() { try { localStorage.setItem('rams-chess-games', JSON.stringify(games.slice(0, 100))); } catch (e) { /* sin almacenamiento */ } }
 
   const settings = Object.assign({
-    mode: 'ai', level: 2, color: 'w', time: 5,
+    mode: 'ai', level: 2, color: 'w', time: 5, coach: false,
     hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true, ttsVoice: 'Kore',
   }, load('rams-chess-settings'));
   let progress = load('rams-chess-progress');   // { lessonId: etapas completadas, _xp: experiencia }
@@ -194,6 +194,8 @@
       el.classList.toggle('selected', state.selected === i);
       el.classList.toggle('check', kingInCheck === i);
       el.classList.toggle('star', view === 'learn' && learn.stars.has(i));
+      el.classList.toggle('coach-from', view === 'play' && !!coach.hintSquares && coach.hintSquares.from === i);
+      el.classList.toggle('coach-to', view === 'play' && !!coach.hintSquares && coach.hintSquares.to === i);
       const target = settings.hints ? state.targets.find((m) => m.to === i) : null;
       el.classList.toggle('hint', !!target);
       el.classList.toggle('capture', !!target && !!target.captured);
@@ -271,9 +273,20 @@
     if (view !== 'play') return;
     const line = $('hint-line');
     line.classList.remove('alert');
+    $('coach-row').hidden = !coachOn();
+    $('btn-hint').disabled = !coachOn() || !canInteract();
     if (state.over) { line.textContent = resultText(state.over); return; }
-    if (state.thinking) { line.textContent = t('thinking'); return; }
     if (state.selected >= 0) { line.textContent = pieceTip(game.get(state.selected), state.targets); return; }
+    if (coachOn() && (coach.msg || coach.verdict)) {
+      const ledOf = (k) => (k === 'err' ? 'err' : k === 'ok' ? 'ok' : k === 'warn' ? 'inaccuracy' : '');
+      let html = `<span class="fb-title"><span class="led ${ledOf(coach.verdict ? coach.verdictKind : coach.kind)}"></span>${t('coach')}</span><br>`;
+      if (coach.verdict) html += coach.verdict;
+      if (coach.msg) html += (coach.verdict ? `<div class="fb">` : '') + (coach.kind ? coach.msg : `<span class="dim">${coach.msg}</span>`) + (coach.verdict ? '</div>' : '');
+      if (state.thinking) html += `<br><span class="dim">${t('thinking')}</span>`;
+      line.innerHTML = html;
+      return;
+    }
+    if (state.thinking) { line.textContent = t('thinking'); return; }
     if (game.inCheck()) { line.textContent = t('check'); line.classList.add('alert'); return; }
     line.textContent = state.log.length ? t(game.turn === 'w' ? 'turn_w' : 'turn_b') : t('welcome');
   }
@@ -325,11 +338,18 @@
 
     state.log.push({ san: done.san, color: done.color, from: done.from, to: done.to, promotion: done.promotion || null });
     if (settings.time > 0 && !state.clockOn) { state.clockOn = true; state.lastTick = Date.now(); }
+    coach.hintSquares = null;
     const st = game.status();
-    if (st.over) { endGame(st.result, st.reason); }
-    else {
+    if (st.over) {
+      if (coachOn() && done.color === state.humanColor && st.reason === 'checkmate') coachSay(t('c_mate'), 'ok');
+      endGame(st.result, st.reason);
+    } else {
       if (game.inCheck()) sfx.check(); else if (done.captured) sfx.capture(); else sfx.move();
       renderAll();
+      if (coachOn()) {
+        if (done.color === state.humanColor) coachAfterHuman(done);   // valora y luego llega la máquina
+        else coachBeforeHuman(done);                                    // explica la jugada rival y prepara la pista
+      }
       if (machineToMove()) requestAIMove();
     }
     return true;
@@ -359,8 +379,10 @@
     state.over = null;
     state.lastMove = playGame.history.length ? playGame.history[playGame.history.length - 1].move : null;
     state.selected = -1; state.targets = [];
+    coach.hintSquares = null; coach.pre = null; coach.verdict = ''; coach.verdictKind = '';
     renderAll();
     if (machineToMove()) requestAIMove();
+    else if (coachOn()) coachBeforeHuman(null);
   }
 
   /* ---------- Interacción: clic y arrastre ---------- */
@@ -490,7 +512,13 @@
     state.flipped = isAIMode() && state.humanColor === 'b';
     state.clocks = { w: settings.time * 60000, b: settings.time * 60000 };
     state.clockOn = false;
-    if (view === 'play') { buildBoard(); renderAll(); if (machineToMove()) requestAIMove(); }
+    coach.on = !!settings.coach && isAIMode();
+    coach.pre = null; coach.hintSquares = null; coach.msg = ''; coach.kind = ''; coach.verdict = ''; coach.verdictKind = ''; coach.tipIndex = 0; coach.req++;
+    if (view === 'play') {
+      buildBoard(); renderAll();
+      if (coachOn()) { coachSay(t('c_intro'), 'ok'); if (!machineToMove()) setTimeout(() => { if (coachOn() && playGame.history.length === 0) coachBeforeHuman(null); }, 3500); }
+      if (machineToMove()) requestAIMove();
+    }
   }
 
   function segValue(id) { return document.querySelector(`#${id} button.on`).dataset.v; }
@@ -511,11 +539,13 @@
     const ai = segValue('seg-mode') === 'ai';
     $('field-level').style.display = ai ? '' : 'none';
     $('field-color').style.display = ai ? '' : 'none';
+    $('field-coach').style.display = ai ? '' : 'none';
   }
 
   $('btn-new').addEventListener('click', () => {
     segSet('seg-mode', settings.mode); segSet('seg-level', settings.level);
     segSet('seg-color', settings.color); segSet('seg-time', settings.time);
+    segSet('seg-coach', settings.coach ? 1 : 0);
     updateModeFields();
     $('dlg-new').showModal();
   });
@@ -525,6 +555,7 @@
     settings.level = +segValue('seg-level');
     settings.color = segValue('seg-color');
     settings.time = +segValue('seg-time');
+    settings.coach = segValue('seg-coach') === '1';
     save();
     $('dlg-new').close();
     if (view !== 'play') setView('play', true);
@@ -925,6 +956,157 @@
   $('btn-rev-start').addEventListener('click', () => reviewGoto(0));
   $('btn-rev-prev').addEventListener('click', () => reviewGoto(review.ply - 1));
   $('btn-rev-next').addEventListener('click', () => reviewGoto(review.ply + 1));
+
+  /* ---------- Jugar con entrenador (guía en tiempo real) ---------- */
+  const coach = { on: false, pre: null, msg: '', kind: '', verdict: '', verdictKind: '', hintSquares: null, req: 0, tipIndex: 0, busy: false };
+  const coachOn = () => view === 'play' && coach.on && isAIMode();
+  const PVAL = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+  const pieceName = (type) => t('piece_names')[type];
+  const sqName = (i) => ChessUtil.toAlg(i);
+
+  function coachAsk(fen) {
+    return new Promise((resolve) => {
+      const id = ++coach.req;
+      if (worker) {
+        const handler = (e) => {
+          if (!e.data.coach || e.data.id !== id) return;
+          worker.removeEventListener('message', handler);
+          resolve(e.data);
+        };
+        worker.addEventListener('message', handler);
+        worker.postMessage({ id, coach: true, fen, time: 200, depth: 3 });
+      } else {
+        setTimeout(() => resolve(ChessAI.coachEval(new Chess().load(fen), { time: 150, depth: 3 })), 20);
+      }
+    });
+  }
+  /* verdict: valoración de tu última jugada (se mantiene hasta la siguiente);
+     msg: amenaza, consejo o pista. Los consejos generales no se leen en voz alta. */
+  function coachSay(msg, kind, opts = {}) {
+    if (opts.verdict) { coach.verdict = msg; coach.verdictKind = kind || ''; coach.msg = ''; coach.kind = ''; }
+    else { coach.msg = msg; coach.kind = kind || ''; if (opts.clearVerdict) { coach.verdict = ''; coach.verdictKind = ''; } }
+    renderStatus();
+    if (opts.silent) return;
+    say(msg);
+  }
+  /* Piezas del color `color` atacadas por el rival y sin defensa (o atacadas por algo más barato) */
+  function hangingPieces(g, color) {
+    const opp = color === 'w' ? 'b' : 'w';
+    const out = [];
+    for (let i = 0; i < 64; i++) {
+      const p = g.get(i);
+      if (!p || p.color !== color || p.type === 'k') continue;
+      if (!g.isAttacked(i, opp)) continue;
+      // ¿defendida? (simulación: si la casilla estuviera vacía, ¿la atacaría el propio color?)
+      const saved = g.board[i]; g.board[i] = null;
+      const defended = g.isAttacked(i, color);
+      g.board[i] = saved;
+      // ¿atacada por una pieza más barata?
+      const cheaper = g.pseudoMoves(opp).some((m) => m.to === i && PVAL[m.piece] < PVAL[p.type]);
+      if (!defended || cheaper) out.push({ sq: i, type: p.type });
+    }
+    out.sort((a, b) => PVAL[b.type] - PVAL[a.type]);
+    return out;
+  }
+  const humanCastled = () => playGame.history.some((h) => h.move.castle && (h.move.color === state.humanColor || (h.move.piece === 'k' && playGame.get(h.move.to) && playGame.get(h.move.to).color === state.humanColor)));
+  function generalTip() {
+    const g = playGame, me = state.humanColor;
+    const bal = g.materialBalance() * (me === 'w' ? 1 : -1);
+    const pieces = g.board.filter((p) => p && p.type !== 'k' && p.type !== 'p').length;
+    const hasCastleRight = g.castling[me + 'K'] || g.castling[me + 'Q'];
+    const tips = [];
+    if (g.fullmove <= 6) tips.push('c_tip_center');
+    if (g.fullmove >= 6 && g.fullmove <= 14 && hasCastleRight) tips.push('c_tip_castle');
+    if (pieces <= 4) tips.push('c_tip_endgame');
+    if (bal >= 3) tips.push('c_tip_trade'); else if (bal <= -3) tips.push('c_tip_behind');
+    tips.push('c_tip_safe');
+    return t(tips[coach.tipIndex++ % tips.length]);
+  }
+
+  /* Turno del humano: analiza la posición (para la pista y la valoración posterior) y avisa de amenazas */
+  async function coachBeforeHuman(machineMove) {
+    if (!coachOn() || state.over) return;
+    const g = playGame, me = state.humanColor, opp = me === 'w' ? 'b' : 'w';
+    const fen = g.fen();
+    coach.pre = null; coach.hintSquares = null;
+    // amenazas inmediatas (baratas, sin motor)
+    let msg = '', kind = '';
+    if (g.inCheck(me)) { msg = t('c_check'); kind = 'err'; }
+    else if (machineMove && machineMove.captured) {
+      msg = t('c_captured', { p: pieceName(machineMove.captured), s: sqName(machineMove.to) }); kind = 'err';
+    }
+    const hang = hangingPieces(g, me);
+    if (!msg && hang.length >= 2) { msg = t('c_attacks_two', { p: pieceName(hang[0].type), s: sqName(hang[0].sq), p2: pieceName(hang[1].type), s2: sqName(hang[1].sq) }); kind = 'err'; }
+    else if (!msg && hang.length === 1 && PVAL[hang[0].type] >= 3) { msg = t('c_attacks', { p: pieceName(hang[0].type), s: sqName(hang[0].sq) }); kind = 'err'; }
+    // ¿amenaza de mate? (si el rival pudiera mover ahora)
+    if (!msg) {
+      const probe = new Chess().load(fen); probe.turn = opp; probe._legalCache = null;
+      if (!probe.inCheck(me)) {
+        const mateMove = probe.legalMoves().find((m) => { probe._apply(m); const mate = probe.isCheckmate(); probe._revert(); return mate; });
+        if (mateMove) { msg = t('c_threat_mate', { m: probe._san(mateMove) }); kind = 'err'; }
+      }
+    }
+    let silent = false;
+    if (!msg) { msg = generalTip(); kind = ''; silent = true; }
+    coachSay(msg, kind, { silent, clearVerdict: !machineMove });
+    const r = await coachAsk(fen);
+    if (playGame.fen() === fen) coach.pre = { fen, best: r.best, score: r.score };
+  }
+
+  /* Tras la jugada del humano: valorar frente a la mejor */
+  async function coachAfterHuman(done) {
+    if (!coachOn()) return;
+    const g = playGame;
+    if (g.isCheckmate()) { coachSay(t('c_mate'), 'ok', { verdict: true }); return; }
+    const pre = coach.pre;
+    coach.hintSquares = null;
+    const fen = g.fen();
+    const after = await coachAsk(fen);                 // mejor respuesta del rival
+    if (!coachOn() || playGame.history.length === 0) return;
+    const playedScore = -after.score;
+    let pre2 = pre && pre.fen ? pre : null;
+    if (!pre2) {                                         // no dio tiempo a analizar antes: analizamos ahora la posición previa
+      const prev = new Chess();
+      for (const h of playGame.history.slice(0, -1)) prev.move({ from: h.move.from, to: h.move.to, promotion: h.move.promotion || null });
+      const r = await coachAsk(prev.fen());
+      if (!coachOn() || playGame.fen() !== fen) return;
+      pre2 = { fen: prev.fen(), best: r.best, score: r.score };
+    }
+    const loss = Math.max(0, ChessAI.cpClamp(pre2.score) - ChessAI.cpClamp(playedScore));
+    const isBest = !!pre2.best && pre2.best.from === done.from && pre2.best.to === done.to;
+    const cls = ChessAI.classify(loss, isBest);
+    const bestSan = pre2.best ? pre2.best.san : null;
+    let msg, kind = 'ok';
+    if (pre2.score > 90000 && playedScore < 90000 && bestSan) { msg = t('c_mate_missed', { m: bestSan }); kind = 'err'; }
+    else if (cls === 'best') msg = t('c_best');
+    else if (cls === 'excellent') msg = t('c_excellent');
+    else if (cls === 'good') msg = bestSan ? t('c_good', { m: bestSan }) : t('c_excellent');
+    else if (cls === 'inaccuracy') { msg = t('c_inaccuracy', { m: bestSan || '…' }); kind = 'warn'; }
+    else if (cls === 'mistake') { msg = t('c_mistake', { m: bestSan || '…' }); kind = 'err'; }
+    else { msg = t('c_blunder', { m: bestSan || '…' }); kind = 'err'; }
+    if ((cls === 'mistake' || cls === 'blunder') && after.best && after.best.captured && loss >= 150) {
+      const victim = g.get(after.best.to);
+      if (victim) msg = t('c_hangs', { p: pieceName(victim.type), s: sqName(after.best.to), r: after.best.san }) + ' ' + (bestSan ? t('better_was', { m: bestSan }) : '');
+    }
+    coachSay(msg, kind, { verdict: true });
+  }
+
+  async function coachHint() {
+    if (!coachOn() || !canInteract()) return;
+    if (!coach.pre || coach.pre.fen !== playGame.fen()) {
+      coachSay(t('c_thinking'), '');
+      const fen = playGame.fen();
+      const r = await coachAsk(fen);
+      if (playGame.fen() !== fen) return;
+      coach.pre = { fen, best: r.best, score: r.score };
+    }
+    const b = coach.pre.best;
+    if (!b) { coachSay(t('c_hint_none'), ''); return; }
+    coach.hintSquares = { from: b.from, to: b.to };
+    select(-1);
+    coachSay(t('c_hint', { m: b.san }), 'ok');
+  }
+  $('btn-hint').addEventListener('click', coachHint);
 
   /* ---------- Voz del entrenador (Web Speech API, sin servicios externos) ---------- */
   const speech = { on: 'speechSynthesis' in window, voice: null };
