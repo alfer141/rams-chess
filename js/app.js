@@ -20,7 +20,7 @@
 
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5, coach: false,
-    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true, ttsVoice: 'Kore', voiceRate: 1.25,
+    hints: true, coords: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true, ttsVoice: 'Kore', voiceRate: 1.25,
   }, load('rams-chess-settings'));
   let progress = load('rams-chess-progress');   // { lessonId: etapas completadas, _xp: experiencia }
   const XP_STAGE = 10, XP_BONUS = 5;
@@ -48,7 +48,8 @@
     log: [],
   };
 
-  const learn = { lesson: null, stage: 0, color: 'w', stars: new Set(), moves: 0, done: false, busy: false, feedback: '', feedbackKind: '', feedbackTitle: '', feedbackXP: '' };
+  const learn = { lesson: null, stage: 0, color: 'w', stars: new Set(), moves: 0, done: false, busy: false, feedback: '', feedbackKind: '', feedbackTitle: '', feedbackXP: '', lineIdx: 0, req: 0 };
+  const sanToMove = (g, san) => { const want = san.replace(/[+#]/g, ''); return g.legalMoves().find((m) => g._san(m).replace(/[+#]/g, '') === want) || null; };
 
   function load(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch (e) { return {}; } }
   function save() {
@@ -583,11 +584,14 @@
     setTimeout(() => { $('btn-reset-progress').textContent = t('reset_progress'); }, 1500);
   });
 
+  $('sw-coords').checked = settings.coords;
+  $('sw-coords').addEventListener('change', (e) => { settings.coords = e.target.checked; save(); applyTheme(); });
   $('sw-hints').checked = settings.hints;
   $('sw-hints').addEventListener('change', (e) => { settings.hints = e.target.checked; save(); renderBoard(); });
 
   function applyTheme() {
     document.documentElement.dataset.theme = settings.theme;
+    $('device').classList.toggle('no-coords', !settings.coords);
     document.documentElement.dataset.accent = settings.accent;
     document.querySelectorAll('#swatches .swatch').forEach((b) => {
       b.classList.toggle('on', b.dataset.accent === settings.accent);
@@ -717,11 +721,13 @@
     learn.stage = i;
     const st = stage();
     game = learnGame;
-    learnGame.load(st.fen);
+    if (st.fen === 'start') learnGame.reset(); else learnGame.load(st.fen);
     learn.color = st.color || 'w';
     learn.stars = new Set((st.stars || []).map(fromAlg));
-    learn.moves = 0; learn.done = false; learn.busy = false;
+    learn.moves = 0; learn.done = false; learn.busy = false; learn.lineIdx = 0; learn.req++;
     if (!keepFeedback) { learn.feedback = ''; learn.feedbackKind = ''; learn.feedbackTitle = ''; learn.feedbackXP = ''; }
+    // Línea de apertura con negras: el rival abre
+    if (st.type === 'line' && learnGame.turn !== learn.color) setTimeout(() => linePlayOpponent(), 600);
     state.selected = -1; state.targets = []; state.lastMove = null; state.over = null;
     state.flipped = learn.color === 'b';
     buildBoard(); renderAll();
@@ -730,6 +736,8 @@
   function learnMove(m) {
     if (learn.feedbackKind === 'err') { learn.feedback = ''; learn.feedbackKind = ''; learn.feedbackTitle = ''; }
     const st = stage(); const g = learnGame;
+    if (st.type === 'line') return lineMove(m);
+    if (st.type === 'play') return playMove(m);
     const opp = learn.color === 'w' ? 'b' : 'w';
     learn.moves++;
     let ok = false, fail = null;
@@ -817,6 +825,111 @@
     const xp = xpTotal(), r = rankFor(xp);
     $('xp-card').innerHTML = meterHTML(xp);
     $('xp-chip').textContent = `${String(xp).padStart(4, '0')} XP · ${t('rank_' + r.piece).toUpperCase()}`;
+  }
+
+  /* Éxito / fallo compartidos por los tipos nuevos */
+  function learnSuccess(msgKey) {
+    const st = stage();
+    learn.done = true; learn.busy = false;
+    sfx.success();
+    const prev = progress[learn.lesson.id] || 0;
+    const firstTime = learn.stage >= prev;
+    progress[learn.lesson.id] = Math.max(prev, learn.stage + 1);
+    let gained = 0;
+    if (firstTime) { gained = XP_STAGE + (learn.moves <= st.par ? XP_BONUS : 0); progress._xp = xpTotal() + gained; }
+    save();
+    learn.feedbackTitle = t('great');
+    const cnt = learn.moves === 1 ? t('in_move') : t('in_moves', { n: learn.moves });
+    learn.feedback = t(msgKey) + ' ' + cnt.charAt(0).toUpperCase() + cnt.slice(1) + '.';
+    learn.feedbackXP = gained ? t('xp_gain', { n: gained }) + (gained > XP_STAGE ? ' · ' + t('xp_bonus') : '') : t('xp_repeat');
+    learn.feedbackKind = 'ok';
+    renderAll();
+    say(learn.feedbackTitle + ' ' + t(msgKey));
+  }
+  function learnFail(msgKey, vars) {
+    learn.busy = true;
+    sfx.fail();
+    learn.feedbackTitle = t('try_again');
+    learn.feedback = t(msgKey, vars);
+    learn.feedbackXP = ''; learn.feedbackKind = 'err';
+    renderAll();
+    say(learn.feedback);
+    const st = stage();
+    setTimeout(() => { if (learn.lesson && learn.busy) loadStage(learn.stage, true); }, st.type === 'play' ? 1800 : 1200);
+  }
+
+  /* Línea de apertura: el alumno debe jugar la jugada prevista; el rival responde solo */
+  function linePlayOpponent() {
+    const st = stage(); const g = learnGame;
+    const step = st.line[learn.lineIdx];
+    if (!step) return;
+    const mv = sanToMove(g, step.san);
+    if (!mv) return;
+    const done = g.move(mv);
+    state.lastMove = done; learn.lineIdx++;
+    sfx.move();
+    learn.feedbackTitle = ''; learn.feedbackXP = '';
+    learn.feedback = t('line_reply', { m: done.san }) + (step.note ? ' ' + L(step.note) : '');
+    learn.feedbackKind = '';
+    learn.busy = false;
+    renderAll();
+    if (learn.lineIdx >= st.line.length) learnSuccess('line_done');
+  }
+  function lineMove(m) {
+    const st = stage(); const g = learnGame;
+    const step = st.line[learn.lineIdx];
+    const expected = step ? step.san.replace(/[+#]/g, '') : null;
+    const played = m.san.replace(/[+#]/g, '');
+    if (played !== expected) {
+      g.undo(); state.lastMove = learn.lineIdx ? g.history[g.history.length - 1].move : null;
+      learn.feedbackTitle = t('try_again'); learn.feedback = t('line_wrong', { m: expected }); learn.feedbackKind = 'err'; learn.feedbackXP = '';
+      sfx.fail(); renderAll(); say(learn.feedback);
+      return;
+    }
+    learn.moves++; learn.lineIdx++;
+    learn.feedbackTitle = ''; learn.feedbackXP = '';
+    learn.feedback = step.note ? L(step.note) : '';
+    learn.feedbackKind = step.note ? 'ok' : '';
+    sfx.move();
+    if (learn.lineIdx >= st.line.length) { learnSuccess('line_done'); return; }
+    learn.busy = true;                       // el rival responde
+    renderAll();
+    if (step.note) say(L(step.note));
+    const req = ++learn.req;
+    setTimeout(() => { if (learn.lesson && learn.req === req) linePlayOpponent(); }, 700);
+  }
+
+  /* Jugar contra el motor hasta cumplir el objetivo */
+  function playGoalReached(m) {
+    const st = stage(); const g = learnGame;
+    if (st.goal === 'mate') return g.isCheckmate();
+    if (st.goal === 'promote') return !!m.promotion;
+    return false;
+  }
+  async function playMove(m) {
+    const st = stage(); const g = learnGame;
+    learn.moves++;
+    if (playGoalReached(m)) { learnSuccess(st.goal === 'mate' ? 'play_mate' : 'play_promoted'); return; }
+    if (g.isStalemate()) { learnFail('play_stalemate'); return; }
+    if (g.status().over) { learnFail('play_draw'); return; }
+    if (learn.moves >= st.maxMoves) { learnFail('play_out_of_moves'); return; }
+    learn.busy = true;
+    learn.feedbackTitle = ''; learn.feedbackXP = ''; learn.feedback = t('c_thinking'); learn.feedbackKind = '';
+    renderAll();
+    const req = ++learn.req;
+    const r = await coachAsk(g.fen());
+    if (!learn.lesson || learn.req !== req) return;
+    if (!r.best) { learn.busy = false; renderAll(); return; }
+    const done = g.move({ from: r.best.from, to: r.best.to, promotion: r.best.promotion || null });
+    state.lastMove = done;
+    if (done && done.captured) sfx.capture(); else sfx.move();
+    learn.busy = false;
+    if (st.goal === 'promote' && done && done.captured === 'p') { learnFail('play_lost_pawn'); return; }
+    if (g.status().over) { learnFail(g.isCheckmate() ? 'play_draw' : 'play_draw'); return; }
+    const left = st.maxMoves - learn.moves;
+    learn.feedback = t('play_reply', { m: done.san }) + ' ' + (left === 1 ? t('play_moves_left_one') : t('play_moves_left', { n: left }));
+    learn.feedbackKind = '';
+    renderAll();
   }
 
   function renderLearn() {

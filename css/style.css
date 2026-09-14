@@ -191,8 +191,13 @@ button { font: inherit; cursor: pointer; }
 .ranks, .files {
   display: grid;
   color: var(--text-soft);
-  font-size: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
+.device.no-coords .ranks, .device.no-coords .files { display: none; }
+.device.no-coords .board-area { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
+.device.no-coords .files { grid-column: 1; }
 .ranks { grid-template-rows: repeat(8, 1fr); align-items: center; }
 .files { grid-column: 2; grid-template-columns: repeat(8, 1fr); text-align: center; align-items: start; }
 .board-frame {

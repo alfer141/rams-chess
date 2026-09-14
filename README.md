@@ -23,8 +23,9 @@ python3 -m http.server 8765
 | Función | Detalle |
 | --- | --- |
 | **Navegación global** | Barra superior con dos secciones, *Jugar* y *Aprender*, y un botón de ajustes (ayudas, tema, sonido, color de acento, idioma, borrar progreso). |
+| **Coordenadas** | Interruptor en Ajustes; letras y números en fuente monoespaciada. |
 | **Color de acento** | Cinco pastillas al estilo Braun: amarillo, naranja, rojo, oliva y azul. Cambia botones, interruptores, estrellas y marcas. |
-| **Aprender** | 15 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado) y avanzado (valor de las piezas, mates típicos). El progreso se guarda. |
+| **Aprender** | 26 lecciones interactivas inspiradas en lichess.org/learn: las piezas, fundamentos (capturar, poner a salvo, jaque, salir del jaque, mate en uno), intermedio (enroque, al paso, evitar el ahogado), aperturas (principios, Italiana, Española, Gambito de Dama, Siciliana y Francesa: juegas tu color y el rival responde solo), finales contra el motor (mate con dama, con torre, escalera, rey y peón con la oposición) y avanzado (valor de las piezas, mate en dos, mates típicos). El progreso se guarda. |
 | **Partidas** | Historial con reproducción jugada a jugada (Inicio / Anterior / Siguiente). Se guarda en el navegador y, con cuenta, en la nube. |
 | **Jugar con entrenador** | Como el *Play with Coach* de chess.com: al crear una partida contra la máquina activas el entrenador. Antes de mover te avisa de jaques, piezas atacadas y amenazas de mate; el botón Pista resalta la mejor jugada; tras tu jugada la valora al instante (mejor, buena, imprecisión, error, error grave, con la alternativa) y sugiere deshacer si fue grave. Todo con el motor local y hablado. |
 | **Entrenador (revisión de partida)** | Como el *Game Review* de chess.com pero con el motor local: clasifica cada jugada (mejor, excelente, buena, imprecisión, error, error grave), calcula la precisión por bando y comenta qué era mejor. Sin API ni coste. |

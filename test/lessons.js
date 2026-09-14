@@ -1,6 +1,6 @@
 // Comprueba que cada etapa de cada lección tiene solución.
 global.window = global; global.self = global;
-require('../js/engine.js'); require('../js/lessons.js');
+require('../js/engine.js'); require('../js/ai.js'); require('../js/lessons.js');
 const { Chess, ChessUtil: { fromAlg, toAlg } } = global;
 const restoreTurn = (g, c) => { g.turn = c; g._legalCache = null; };
 function solve(g, color, goal, depth) {           // DFS con rival estático
@@ -16,7 +16,7 @@ function solve(g, color, goal, depth) {           // DFS con rival estático
 }
 let fails = 0;
 for (const les of LESSONS.lessons) les.stages.forEach((st, i) => {
-  const g = new Chess().load(st.fen); const color = st.color || 'w';
+  const g = new Chess(); if (st.fen !== 'start') g.load(st.fen); const color = st.color || 'w';
   let ok = false, why = '';
   const moves = g.legalMoves();
   switch (st.type) {
@@ -38,6 +38,26 @@ for (const les of LESSONS.lessons) les.stages.forEach((st, i) => {
     case 'safe': { const t = fromAlg(st.target); const opp = color === 'w' ? 'b' : 'w';
       ok = g.isAttacked(t, opp) && moves.some((m) => m.from === t && !(() => { g._apply(m); const a = g.isAttacked(m.to, opp); g._revert(); return a; })()); why = 'pieza no atacada o sin casilla segura'; break; }
     case 'value': ok = moves.some((m) => m.captured === st.target); why = 'no se puede capturar ' + st.target; break;
+    case 'line': {
+      const gl = new Chess(); if (st.fen !== 'start') gl.load(st.fen);
+      ok = true;
+      for (const step of st.line) {
+        const mv = gl.legalMoves().find((m) => gl._san(m).replace(/[+#]/g, '') === step.san.replace(/[+#]/g, ''));
+        if (!mv) { ok = false; why = 'jugada ilegal en la línea: ' + step.san; break; }
+        gl.move(mv);
+      }
+      break;
+    }
+    case 'play': {
+      if (st.goal === 'mate' && st.maxMoves <= 2) {
+        const mateIn1 = moves.some((m) => { g._apply(m); const c = g.isCheckmate(); g._revert(); return c; });
+        const r = ChessAI.coachEval(g, { time: 8000, depth: 4 });
+        ok = !mateIn1 && r.score > 90000; why = mateIn1 ? 'hay mate en una' : 'el motor no encuentra mate en dos (' + r.score + ')';
+      } else {
+        ok = moves.length > 0 && !g.status().over; why = 'posición terminal';
+      }
+      break;
+    }
   }
   console.log(`${ok ? 'OK  ' : 'FAIL'} ${les.id} etapa ${i + 1} (${st.type})${ok ? '' : ' — ' + why}`);
   if (!ok) fails++;
