@@ -195,9 +195,17 @@ button { font: inherit; cursor: pointer; }
   font-size: 11px;
   letter-spacing: 0.04em;
 }
-.device.no-coords .ranks, .device.no-coords .files { display: none; }
-.device.no-coords .board-area { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
-.device.no-coords .files { grid-column: 1; }
+ /* Coordenadas dentro de las casillas (Ajustes): se ocultan las del borde */
+.device.sq-coords .ranks, .device.sq-coords .files { display: none; }
+.device.sq-coords .board-area { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
+.device.sq-coords .files { grid-column: 1; }
+.sq .coord {
+  position: absolute; top: 4%; right: 6%;
+  font-family: var(--mono); font-size: clamp(7px, 1.1vw, 11px); font-weight: 700; letter-spacing: 0.02em;
+  color: var(--sq-dark); pointer-events: none; z-index: 1; user-select: none;
+}
+.sq.dark .coord { color: var(--sq-light); }
+@media (max-width: 900px) { .sq .coord { font-size: 8px; top: 3%; right: 5%; } }
 .ranks { grid-template-rows: repeat(8, 1fr); align-items: center; }
 .files { grid-column: 2; grid-template-columns: repeat(8, 1fr); text-align: center; align-items: start; }
 .board-frame {

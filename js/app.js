@@ -190,7 +190,8 @@
     for (let i = 0; i < 64; i++) {
       const el = squares[i];
       const p = game.get(i);
-      el.innerHTML = p ? pieceSVG(p) : '';
+      const coord = settings.coords ? `<span class="coord">${FILES[fileOf(i)].toUpperCase()}${rankOf(i) + 1}</span>` : '';
+      el.innerHTML = coord + (p ? pieceSVG(p) : '');
       el.classList.toggle('last', !!state.lastMove && (state.lastMove.from === i || state.lastMove.to === i));
       el.classList.toggle('selected', state.selected === i);
       el.classList.toggle('check', kingInCheck === i);
@@ -585,13 +586,13 @@
   });
 
   $('sw-coords').checked = settings.coords;
-  $('sw-coords').addEventListener('change', (e) => { settings.coords = e.target.checked; save(); applyTheme(); });
+  $('sw-coords').addEventListener('change', (e) => { settings.coords = e.target.checked; save(); applyTheme(); renderBoard(); });
   $('sw-hints').checked = settings.hints;
   $('sw-hints').addEventListener('change', (e) => { settings.hints = e.target.checked; save(); renderBoard(); });
 
   function applyTheme() {
     document.documentElement.dataset.theme = settings.theme;
-    $('device').classList.toggle('no-coords', !settings.coords);
+    $('device').classList.toggle('sq-coords', !!settings.coords);
     document.documentElement.dataset.accent = settings.accent;
     document.querySelectorAll('#swatches .swatch').forEach((b) => {
       b.classList.toggle('on', b.dataset.accent === settings.accent);
