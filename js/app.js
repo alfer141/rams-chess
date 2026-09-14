@@ -20,7 +20,7 @@
 
   const settings = Object.assign({
     mode: 'ai', level: 2, color: 'w', time: 5, coach: false,
-    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true, ttsVoice: 'Kore',
+    hints: true, theme: 'light', sound: true, lang: 'es', accent: 'yellow', voice: true, ttsVoice: 'Kore', voiceRate: 1.25,
   }, load('rams-chess-settings'));
   let progress = load('rams-chess-progress');   // { lessonId: etapas completadas, _xp: experiencia }
   const XP_STAGE = 10, XP_BONUS = 5;
@@ -609,6 +609,12 @@
     const b = e.target.closest('button'); if (!b) return;
     settings.ttsVoice = b.dataset.v; save();
   });
+  document.querySelectorAll('#rate-seg button').forEach((b) => b.classList.toggle('on', +b.dataset.v === +settings.voiceRate));
+  $('rate-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    settings.voiceRate = +b.dataset.v; save();
+    if (tts.el && !tts.el.paused) tts.el.playbackRate = settings.voiceRate;
+  });
   $('btn-voice-test').addEventListener('click', () => { const was = settings.voice; settings.voice = true; say(t('tts_sample')); settings.voice = was; });
 
   document.querySelectorAll('#lang-seg button').forEach((b) => b.classList.toggle('on', b.dataset.lang === settings.lang));
@@ -1120,8 +1126,28 @@
   if (speech.on) speechSynthesis.onvoiceschanged = () => { speech.voice = pickVoice(); };
   /* Voz en la nube (Gemini TTS a través de /api/tts). Si la función no está
      configurada (501), falla o agota la cuota, se usa la voz del navegador. */
-  const tts = { available: true, cache: new Map(), source: null, seq: 0 };
+  const tts = { available: true, cache: new Map(), seq: 0, el: null, unlocked: false };
   const ttsKey = (text) => `${I18N.lang}|${settings.ttsVoice}|${text}`;
+  const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+  function ttsElement() {
+    if (!tts.el) {
+      tts.el = new Audio();
+      tts.el.preload = 'auto';
+      tts.el.addEventListener('play', () => $('btn-review').classList.add('speaking'));
+      tts.el.addEventListener('ended', () => $('btn-review').classList.remove('speaking'));
+      tts.el.addEventListener('pause', () => $('btn-review').classList.remove('speaking'));
+    }
+    return tts.el;
+  }
+  // iOS solo deja reproducir <audio> tras un gesto: lo desbloqueamos con un silencio en el primer toque
+  function ttsUnlock() {
+    if (tts.unlocked) return;
+    tts.unlocked = true;
+    const el = ttsElement();
+    el.src = SILENT_WAV;
+    el.play().catch(() => { tts.unlocked = false; });
+  }
+  document.addEventListener('pointerdown', ttsUnlock, { once: true });
   async function ttsFetch(text) {
     const key = ttsKey(text);
     if (tts.cache.has(key)) return tts.cache.get(key);
@@ -1134,29 +1160,25 @@
       if (!res.ok) throw new Error('tts-' + res.status);
       try { if ('caches' in window) { const c = await caches.open('rams-tts-v1'); await c.put(url, res.clone()); } } catch (e) { /* sin caché */ }
     }
-    const buf = await res.arrayBuffer();
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    const decoded = await audio.decodeAudioData(buf);
-    tts.cache.set(key, decoded);
-    return decoded;
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    tts.cache.set(key, objectUrl);
+    return objectUrl;
   }
   function ttsStop() {
-    if (tts.source) { try { tts.source.stop(); } catch (e) { /* ya parado */ } tts.source = null; }
+    if (tts.el) { try { tts.el.pause(); tts.el.currentTime = 0; } catch (e) { /* ignorar */ } }
     $('btn-review').classList.remove('speaking');
   }
   async function sayCloud(text) {
     const seq = ++tts.seq;
-    const decoded = await ttsFetch(text);
+    const url = await ttsFetch(text);
     if (seq !== tts.seq) return;           // llegó una frase más nueva mientras se generaba
     ttsStop();
-    if (audio.state === 'suspended') await audio.resume();
-    const src = audio.createBufferSource();
-    src.buffer = decoded;
-    src.connect(audio.destination);
-    src.onended = () => { if (tts.source === src) { tts.source = null; $('btn-review').classList.remove('speaking'); } };
-    tts.source = src;
-    $('btn-review').classList.add('speaking');
-    src.start();
+    const el = ttsElement();
+    el.src = url;
+    el.preservesPitch = true; el.webkitPreservesPitch = true; el.mozPreservesPitch = true;
+    el.playbackRate = settings.voiceRate || 1;
+    await el.play();
   }
   function say(text) {
     if (!settings.voice || !text) return;
@@ -1173,7 +1195,7 @@
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text.replace(/[#+]/g, ''));
       u.lang = I18N.lang === 'es' ? 'es-ES' : 'en-GB';
-      u.rate = 1; u.pitch = 1;
+      u.rate = settings.voiceRate || 1; u.pitch = 1;
       speech.voice = speech.voice || pickVoice();
       if (speech.voice) u.voice = speech.voice;
       const btn = $('btn-review');
@@ -1339,7 +1361,7 @@
 
   // API mínima para depurar desde la consola
   window.RamsChess = {
-    get game() { return game; }, state, settings, learn, review,
+    get game() { return game; }, state, settings, learn, review, tts, coach,
     get games() { return games; },
     render: renderAll, setView, openLesson, openGame,
     load(fen) { cancelAI(); game.load(fen); state.log = []; state.lastMove = null; state.over = null; select(-1); renderAll(); },
